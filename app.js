@@ -217,6 +217,9 @@ function navTo(pageId) {
   if (pageId === 'page-all-catches') prepAllCatches();
   if (pageId === 'page-tackle')      renderTackleList();
   if (pageId === 'page-rods')        renderRodList();
+  if (pageId === 'page-shops')       { renderShops(); populateShopStateFilter(); }
+  if (pageId === 'page-shop-add' && !_skipShopReset) resetShopForm();
+  _skipShopReset = false;
   if (pageId === 'page-log' && !_skipLogReset) {
     document.getElementById('logPageTitle').textContent = 'Log a Catch';
     document.getElementById('logSaveBtn').textContent   = '🎣 Save Catch';
@@ -296,6 +299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   refreshRodDropdown();
 
   loadCatches();
+  loadShops();
 });
 
 function applyOwnerName() {
@@ -324,7 +328,7 @@ function toggleTimeField() {
 /* ─── STATE DROPDOWNS ───────────────────────────────────── */
 function populateStateDropdowns() {
   const def = getSettings().defaultState || '';
-  ['fState','settingsDefaultState'].forEach(id => {
+  ['fState','settingsDefaultState','sState'].forEach(id => {
     const sel = document.getElementById(id);
     if (!sel) return;
     sel.innerHTML = id === 'settingsDefaultState'
@@ -333,7 +337,7 @@ function populateStateDropdowns() {
     US_STATES.forEach(s => {
       const o = document.createElement('option');
       o.value = s; o.textContent = s;
-      if (s === def) o.selected = true;
+      if (id === 'fState' && s === def) o.selected = true;
       sel.appendChild(o);
     });
   });
@@ -1082,6 +1086,200 @@ let toastTimer;
 function showToast(msg,type='') { const el=document.getElementById('toast'); el.textContent=msg; el.className='toast show'+(type?' '+type:''); clearTimeout(toastTimer); toastTimer=setTimeout(()=>el.classList.remove('show'),3500); }
 function showLoading(msg='Loading…') { document.getElementById('loadingMsg').textContent=msg; document.getElementById('loadingOverlay').classList.add('active'); }
 function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+/* ═══════════════════════════════════════════════════════════
+   FISH SHOPS
+═══════════════════════════════════════════════════════════ */
+
+let allShops      = [];
+let _skipShopReset = false;
+
+const SHOP_TYPES = ['Fly Fishing','Ocean Fishing','Bass Fishing','All'];
+const SHOP_TYPE_EMOJI = {
+  'Fly Fishing':   '🪰',
+  'Ocean Fishing': '🌊',
+  'Bass Fishing':  '🐟',
+  'All':           '🎣',
+};
+
+async function loadShops() {
+  if (!CONFIG.WEB_APP_URL) return;
+  try {
+    const resp = await fetch(`${CONFIG.WEB_APP_URL}?action=getShops`);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    allShops = data.shops || [];
+    renderShops();
+    populateShopStateFilter();
+  } catch(err) {
+    console.error('Shops load error:', err);
+  }
+}
+
+function populateShopStateFilter() {
+  const sel = document.getElementById('shopFilterState');
+  if (!sel) return;
+  const current = sel.value;
+  const states  = [...new Set(allShops.map(s=>s.state).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All States</option>';
+  states.forEach(s => sel.insertAdjacentHTML('beforeend',`<option value="${esc(s)}">${esc(s)}</option>`));
+  sel.value = current;
+}
+
+function renderShops() {
+  const el         = document.getElementById('shopGrid');
+  if (!el) return;
+  const stateVal   = (document.getElementById('shopFilterState')||{}).value || '';
+  const typeVal    = (document.getElementById('shopFilterType')||{}).value  || '';
+
+  const filtered   = allShops.filter(s => {
+    if (stateVal && s.state    !== stateVal) return false;
+    if (typeVal  && s.shopType !== typeVal)  return false;
+    return true;
+  });
+
+  if (!filtered.length) {
+    el.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="fish-big">🏪</div><h3>No shops yet</h3><p>Tap "+ Add Shop" to add your first fish shop.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = filtered.map((s,i) => {
+    const photoHtml = s.photoUrl && s.photoUrl.trim()
+      ? `<img class="shop-photo" src="${esc(s.photoUrl)}" alt="${esc(s.name)}" loading="lazy" referrerpolicy="no-referrer" />`
+      : `<div class="shop-photo-placeholder">${SHOP_TYPE_EMOJI[s.shopType]||'🏪'}</div>`;
+    const location = [s.city, s.state].filter(Boolean).join(', ');
+    return `<div class="shop-card" style="animation-delay:${Math.min(i,8)*40}ms" onclick="openShopDetail('${esc(s.id)}')">
+      ${photoHtml}
+      <div class="shop-body">
+        <div class="shop-name">${esc(s.name)}</div>
+        ${location ? `<div class="shop-location">📍 ${esc(location)}</div>` : ''}
+        ${s.shopType ? `<span class="shop-type-badge">${SHOP_TYPE_EMOJI[s.shopType]||''} ${esc(s.shopType)}</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openShopDetail(id) {
+  const s = allShops.find(x => x.id === id);
+  if (!s) return;
+  const photoHtml = s.photoUrl && s.photoUrl.trim()
+    ? `<img class="shop-detail-photo" src="${esc(s.photoUrl)}" alt="${esc(s.name)}" referrerpolicy="no-referrer" />`
+    : `<div class="shop-detail-placeholder">${SHOP_TYPE_EMOJI[s.shopType]||'🏪'}</div>`;
+  const location = [s.city, s.state].filter(Boolean).join(', ');
+  const fields = [
+    { label:'Shop Type', value: s.shopType ? `${SHOP_TYPE_EMOJI[s.shopType]||''} ${s.shopType}` : '—' },
+    { label:'City',      value: s.city    || '—' },
+    { label:'State',     value: s.state   || '—' },
+    { label:'Address',   value: s.address || '—' },
+  ];
+  document.getElementById('shopDetailBody').innerHTML = `
+    ${photoHtml}
+    <div class="page-content">
+      <div class="detail-fish-name">${esc(s.name)}</div>
+      ${location ? `<div style="font-family:'DM Mono',monospace;font-size:.75rem;color:var(--water);margin-bottom:14px">📍 ${esc(location)}</div>` : ''}
+      <div class="detail-grid">
+        ${fields.map(f=>`<div class="detail-item"><div class="detail-item-label">${f.label}</div><div class="detail-item-value">${esc(f.value)}</div></div>`).join('')}
+      </div>
+      ${s.notes ? `<div class="detail-notes"><div class="detail-item-label" style="margin-bottom:5px">Notes</div>${esc(s.notes)}</div>` : ''}
+      <div class="detail-actions">
+        <button class="btn btn-outline" onclick="openEditShop('${esc(s.id)}')">✏️ Edit</button>
+        <button class="btn btn-danger" onclick="deleteShop('${esc(s.id)}')">🗑 Delete</button>
+      </div>
+    </div>`;
+  navTo('page-shop-detail');
+}
+
+function openEditShop(id) {
+  const s = allShops.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('shopFormTitle').textContent = 'Edit Shop';
+  document.getElementById('shopSaveBtn').textContent   = '💾 Save Changes';
+  document.getElementById('sEditId').value       = s.id;
+  document.getElementById('sExistingPhoto').value = s.photoUrl || '';
+  document.getElementById('sName').value    = s.name    || '';
+  document.getElementById('sCity').value    = s.city    || '';
+  document.getElementById('sAddress').value = s.address || '';
+  document.getElementById('sNotes').value   = s.notes   || '';
+  document.getElementById('sState').value   = s.state   || '';
+  document.getElementById('sShopType').value = s.shopType || '';
+  const prev = document.getElementById('sPhotoPreview');
+  if (s.photoUrl && s.photoUrl.trim()) { prev.src = s.photoUrl; prev.classList.add('show'); }
+  else prev.classList.remove('show');
+  document.getElementById('sPhoto').value = '';
+  _skipShopReset = true;
+  navTo('page-shop-add');
+}
+
+async function submitShop() {
+  const name = document.getElementById('sName').value.trim();
+  const city  = document.getElementById('sCity').value.trim();
+  const editId = document.getElementById('sEditId').value;
+  if (!name) { showToast('Shop name is required!','error'); return; }
+  if (!city)  { showToast('City is required!','error'); return; }
+  if (!CONFIG.WEB_APP_URL) { showToast('Set your Web App URL in config.js.','error'); return; }
+  showLoading(editId ? 'Saving shop…' : 'Adding shop…');
+
+  let photoB64 = '';
+  const photoFile = document.getElementById('sPhoto').files[0];
+  if (photoFile) { photoB64 = await fileToBase64(photoFile); photoB64 = await resizeImage(photoB64, 900); }
+
+  const payload = {
+    action:        editId ? 'editShop' : 'addShop',
+    id:            editId || undefined,
+    name,
+    city,
+    address:       document.getElementById('sAddress').value.trim(),
+    state:         document.getElementById('sState').value,
+    shopType:      document.getElementById('sShopType').value,
+    notes:         document.getElementById('sNotes').value.trim(),
+    photo:         photoB64,
+    existingPhoto: document.getElementById('sExistingPhoto').value,
+  };
+
+  try {
+    const resp = await fetch(CONFIG.WEB_APP_URL, { method:'POST', body: JSON.stringify(payload) });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    showToast(editId ? '✏️ Shop updated!' : '🏪 Shop added!','success');
+    navBack();
+    await loadShops();
+  } catch(err) {
+    console.error(err); showToast('Failed to save: '+err.message,'error');
+  } finally { hideLoading(); }
+}
+
+async function deleteShop(id) {
+  if (!confirm('Delete this shop? Cannot be undone.')) return;
+  showLoading('Deleting…');
+  try {
+    const resp = await fetch(CONFIG.WEB_APP_URL, { method:'POST', body: JSON.stringify({ action:'deleteShop', id }) });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    showToast('Shop deleted.','success');
+    navBack();
+    await loadShops();
+  } catch(err) { showToast('Delete failed: '+err.message,'error'); }
+  finally { hideLoading(); }
+}
+
+function resetShopForm() {
+  document.getElementById('shopFormTitle').textContent = 'Add Fish Shop';
+  document.getElementById('shopSaveBtn').textContent   = '🏪 Save Shop';
+  document.getElementById('sEditId').value        = '';
+  document.getElementById('sExistingPhoto').value = '';
+  ['sName','sCity','sAddress','sNotes'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('sState').value    = '';
+  document.getElementById('sShopType').value = '';
+  document.getElementById('sPhoto').value    = '';
+  document.getElementById('sPhotoPreview').classList.remove('show');
+}
+
+function previewShopPhoto() {
+  const file = document.getElementById('sPhoto').files[0];
+  const img  = document.getElementById('sPhotoPreview');
+  if (file) { const r=new FileReader(); r.onload=e=>{img.src=e.target.result;img.classList.add('show');}; r.readAsDataURL(file); }
+  else img.classList.remove('show');
+}
 
 /* ─── UTILS ──────────────────────────────────────────────── */
 function esc(str) { if(str==null) return ''; return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
