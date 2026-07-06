@@ -193,8 +193,15 @@
     .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 13px; border-radius: 8px; border: 1.5px solid #ddd; font-family: 'DM Sans', sans-serif; font-size: .9rem; background: #fff; color: var(--ink); outline: none; transition: border-color .18s; }
     .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--water); box-shadow: 0 0 0 3px rgba(44,110,138,.1); }
     .form-group textarea { min-height: 72px; resize: vertical; }
-    .photo-preview { width: 100%; max-height: 200px; object-fit: cover; border-radius: 8px; margin-top: 8px; display: none; border: 1.5px solid #ddd; }
+    .photo-preview { width: 100%; aspect-ratio: 1/1; object-fit: cover; object-position: center; border-radius: 8px; margin-top: 8px; display: none; border: 1.5px solid #ddd; }
     .photo-preview.show { display: block; }
+    .crop-control { display: none; margin-top: 8px; }
+    .crop-control.show { display: block; }
+    .crop-label { font-family: 'DM Mono', monospace; font-size: .66rem; letter-spacing: .06em; text-transform: uppercase; color: var(--water-dk); margin-bottom: 6px; }
+    .crop-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 4px; max-width: 160px; }
+    .crop-btn { background: var(--parchment); border: 1.5px solid var(--line); border-radius: 6px; padding: 6px; cursor: pointer; font-size: .75rem; text-align: center; transition: all .15s; }
+    .crop-btn:hover { border-color: var(--water); background: rgba(44,110,138,.08); }
+    .crop-btn.active { background: var(--water); color: #fff; border-color: var(--water); }
     .form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 
     /* ── GEAR PAGES ── */
@@ -231,8 +238,8 @@
     .shop-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 16px; }
     .shop-card { background: #fff; border-radius: var(--r); border: 1px solid var(--line); box-shadow: var(--shadow); overflow: hidden; cursor: pointer; transition: transform .2s, box-shadow .2s; animation: fadeUp .3s ease both; }
     .shop-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(26,26,20,.16); }
-    .shop-photo { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; background: #d8eaf2; }
-    .shop-photo-placeholder { width: 100%; aspect-ratio: 4/3; background: linear-gradient(135deg,#fff3e0,#ffe0b2); display: flex; align-items: center; justify-content: center; font-size: 3rem; }
+    .shop-photo { width: 100%; aspect-ratio: 1/1; object-fit: cover; object-position: center; display: block; background: #d8eaf2; }
+    .shop-photo-placeholder { width: 100%; aspect-ratio: 1/1; background: linear-gradient(135deg,#fff3e0,#ffe0b2); display: flex; align-items: center; justify-content: center; font-size: 3rem; }
     .shop-body { padding: 12px 14px 14px; }
     .shop-name { font-family: 'Playfair Display', serif; font-size: 1.1rem; font-weight: 700; }
     .shop-location { font-family: 'DM Mono', monospace; font-size: .7rem; color: var(--water); margin-top: 4px; }
@@ -240,7 +247,7 @@
     .shop-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
     .shop-filters select { font-family: 'DM Sans', sans-serif; font-size: .84rem; padding: 7px 11px; border-radius: 6px; border: 1.5px solid var(--line); background: #fff; color: var(--ink); outline: none; }
     .shop-filters select:focus { border-color: var(--water); }
-    .shop-detail-photo { width: 100%; max-height: 300px; object-fit: cover; display: block; background: #d8eaf2; }
+    .shop-detail-photo { width: 100%; height: auto; max-height: 70vh; object-fit: contain; display: block; background: #111; }
     .shop-detail-placeholder { width: 100%; height: 200px; background: linear-gradient(135deg,#fff3e0,#ffe0b2); display: flex; align-items: center; justify-content: center; font-size: 4rem; }
 
     /* ── SETTINGS PAGE ── */
@@ -359,6 +366,7 @@
     <div class="form-wrap">
       <input type="hidden" id="fEditId" />
       <input type="hidden" id="fExistingPhoto" />
+      <input type="hidden" id="fCropPos" value="center center" />
       <div class="form-row">
         <div class="form-group">
           <label>Fish Type *</label>
@@ -431,6 +439,10 @@
         <label>Photo <small style="font-weight:300;text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif">(editing: leave blank to keep existing)</small></label>
         <input type="file" id="fPhoto" accept="image/*" onchange="previewPhoto()" />
         <img id="fPhotoPreview" class="photo-preview" alt="Preview" />
+        <div class="crop-control" id="fCropControl">
+          <div class="crop-label">Crop position</div>
+          <div class="crop-grid" id="fCropGrid"></div>
+        </div>
       </div>
       <div class="form-actions">
         <button class="btn btn-outline" onclick="navBack()">Cancel</button>
@@ -622,6 +634,7 @@
     <div class="form-wrap">
       <input type="hidden" id="sEditId" />
       <input type="hidden" id="sExistingPhoto" />
+      <input type="hidden" id="sCropPos" value="center center" />
       <div class="form-group">
         <label>Shop Name *</label>
         <input type="text" id="sName" placeholder="Bob's Bait &amp; Tackle" />
@@ -658,6 +671,10 @@
         <label>Photo <small style="font-weight:300;text-transform:none;letter-spacing:0;font-family:'DM Sans',sans-serif">(editing: leave blank to keep existing)</small></label>
         <input type="file" id="sPhoto" accept="image/*" onchange="previewShopPhoto()" />
         <img id="sPhotoPreview" class="photo-preview" alt="Preview" />
+        <div class="crop-control" id="sCropControl">
+          <div class="crop-label">Crop position</div>
+          <div class="crop-grid" id="sCropGrid"></div>
+        </div>
       </div>
       <div class="form-actions">
         <button class="btn btn-outline" onclick="navBack()">Cancel</button>
