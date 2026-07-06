@@ -8,7 +8,7 @@
 //  4. Save, then Deploy → Manage Deployments → New version → Deploy
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_ID    = "10rqVPyLthOjmbVY0z9k8bPjidEKc7LK0nhCLo2pVY-s";
+const SHEET_ID    = "YOUR_SHEET_ID_HERE";
 const SHEET_TAB   = "Catches";
 const APPDATA_TAB = "AppData";
 const SHOPS_TAB   = "FishShops";
@@ -203,7 +203,7 @@ function deleteShop(id) {
 //  APP DATA SYNC
 // ═══════════════════════════════════════════════════════════
 
-const APPDATA_KEYS = ["tackle","rods","favorites","settings"];
+const APPDATA_KEYS = ["tackle","rods","favorites","settings","crops"];
 
 function getAppData() {
   const sheet = getAppDataSheet();

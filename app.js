@@ -86,6 +86,7 @@ const SHEET_KEY_MAP = {
   get [pfx()+'rods']()     { return 'rods'; },
   get [pfx()+'favs']()     { return 'favorites'; },
   get [pfx()+'settings']() { return 'settings'; },
+  get [pfx()+'crops']()    { return 'crops'; },
 };
 
 // Generic setter: writes locally + stamps time + queues a Sheets push
@@ -107,7 +108,7 @@ let _syncTimer   = null;
 
 function queueSyncPush(localKey, value) {
   if (!CONFIG.WEB_APP_URL) return;
-  const sheetKey = { [pfx()+'tackle']:'tackle', [pfx()+'rods']:'rods', [pfx()+'favs']:'favorites', [pfx()+'settings']:'settings' }[localKey];
+  const sheetKey = { [pfx()+'tackle']:'tackle', [pfx()+'rods']:'rods', [pfx()+'favs']:'favorites', [pfx()+'settings']:'settings', [pfx()+'crops']:'crops' }[localKey];
   if (!sheetKey) return;
   _syncPending[sheetKey] = value;
   clearTimeout(_syncTimer);
@@ -145,10 +146,11 @@ async function pullAndMergeAppData() {
 
     // Map sheet keys back to local namespaced keys
     const sheetToLocal = {
-      tackle:   pfx()+'tackle',
-      rods:     pfx()+'rods',
-      favorites:pfx()+'favs',
-      settings: pfx()+'settings',
+      tackle:    pfx()+'tackle',
+      rods:      pfx()+'rods',
+      favorites: pfx()+'favs',
+      settings:  pfx()+'settings',
+      crops:     pfx()+'crops',
     };
 
     Object.entries(sheetToLocal).forEach(([sheetKey, localKey]) => {
@@ -831,8 +833,14 @@ function renderStateBreakdown(catches) {
 
 /* ─── BUILD CATCH CARD ───────────────────────────────────── */
 // Crop positions stored locally by ID (display preference, no need for sheet column)
-function getCropPos(id) { return ls.get('fl_crop_'+id, 'center center'); }
-function setCropPos(id, pos) { ls.set('fl_crop_'+id, pos); }
+// Crop positions stored as one synced dict: { id: "top center", ... }
+function getCropDict()    { return ls.get(pfx()+'crops', {}); }
+function getCropPos(id)   { return getCropDict()[id] || 'center center'; }
+function setCropPos(id, pos) {
+  const dict = getCropDict();
+  dict[id] = pos;
+  setSynced(pfx()+'crops', dict);
+}
 
 function buildCatchCard(c, i, isFavCard) {
   const dt = c.date ? new Date(c.date).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '';
