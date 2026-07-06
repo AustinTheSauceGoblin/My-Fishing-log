@@ -638,12 +638,16 @@ async function submitCatch() {
     notes:         document.getElementById('fNotes').value.trim(),
     photo:         photoB64,
     existingPhoto: document.getElementById('fExistingPhoto').value,
+    cropPos:       document.getElementById('fCropPos').value || 'center center',
   };
 
   try {
     const resp = await fetch(CONFIG.WEB_APP_URL, { method:'POST', body: JSON.stringify(payload) });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
+    // Save crop position locally (keyed by ID returned from server, or editId)
+    const savedId = data.id || editId;
+    if (savedId) setCropPos(savedId, payload.cropPos);
     showToast(editId ? '✏️ Catch updated!' : '🎣 Catch logged!','success');
     navBack();
     resetForm();
@@ -826,11 +830,16 @@ function renderStateBreakdown(catches) {
 }
 
 /* ─── BUILD CATCH CARD ───────────────────────────────────── */
+// Crop positions stored locally by ID (display preference, no need for sheet column)
+function getCropPos(id) { return ls.get('fl_crop_'+id, 'center center'); }
+function setCropPos(id, pos) { ls.set('fl_crop_'+id, pos); }
+
 function buildCatchCard(c, i, isFavCard) {
   const dt = c.date ? new Date(c.date).toLocaleString(undefined,{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}) : '';
-  const faved = isFav(c.id);
+  const faved   = isFav(c.id);
+  const cropPos = getCropPos(c.id);
   const photoHtml = c.photoUrl && c.photoUrl.trim()
-    ? `<img class="catch-photo" src="${esc(c.photoUrl)}" alt="${esc(c.fish)}" loading="lazy" referrerpolicy="no-referrer" />`
+    ? `<img class="catch-photo" src="${esc(c.photoUrl)}" alt="${esc(c.fish)}" loading="lazy" referrerpolicy="no-referrer" style="object-position:${cropPos}" />`
     : `<div class="catch-photo-placeholder">${getFishEmoji(c.fish)}</div>`;
   const tags = [c.trip,c.state].filter(Boolean);
   return `<div class="catch-card${isFavCard?' fav-card':''}" style="animation-delay:${Math.min(i,8)*40}ms">
@@ -955,7 +964,20 @@ function openEditCatch(id) {
   refreshRodDropdown();
   document.getElementById('fRod').value = c.rod || '';
   const prev = document.getElementById('fPhotoPreview');
-  if (c.photoUrl&&c.photoUrl.trim()) { prev.src=c.photoUrl; prev.classList.add('show'); } else prev.classList.remove('show');
+  if (c.photoUrl && c.photoUrl.trim()) {
+    prev.src = c.photoUrl;
+    prev.classList.add('show');
+    // Restore saved crop position
+    const savedCrop = c.cropPos || 'center center';
+    document.getElementById('fCropPos').value = savedCrop;
+    prev.style.objectPosition = savedCrop;
+    document.getElementById('fCropControl').classList.add('show');
+    buildCropGrid('fCropGrid','fCropPos','fPhotoPreview');
+  } else {
+    prev.classList.remove('show');
+    document.getElementById('fCropControl').classList.remove('show');
+    document.getElementById('fCropPos').value = 'center center';
+  }
   document.getElementById('fPhoto').value='';
   _skipLogReset = true;
   navTo('page-log');
@@ -1059,6 +1081,8 @@ function resetForm() {
   ['fFish','fWeight','fLureCustom','fWith','fLocation','fTrip','fNotes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('fPhoto').value='';
   document.getElementById('fPhotoPreview').classList.remove('show');
+  document.getElementById('fCropControl').classList.remove('show');
+  document.getElementById('fCropPos').value = 'center center';
   // Reset date/time toggle back to full datetime mode
   document.getElementById('fNoTime').checked = false;
   document.getElementById('fDate').style.display = '';
@@ -1068,11 +1092,73 @@ function resetForm() {
   refreshLureDropdown(); refreshRodDropdown();
 }
 
+/* ─── CROP POSITION CONTROL ──────────────────────────────── */
+const CROP_POSITIONS = [
+  { label:'↖', pos:'top left' },    { label:'↑', pos:'top center' },    { label:'↗', pos:'top right' },
+  { label:'←', pos:'center left' }, { label:'·', pos:'center center' }, { label:'→', pos:'center right' },
+  { label:'↙', pos:'bottom left' }, { label:'↓', pos:'bottom center' }, { label:'↘', pos:'bottom right' },
+];
+
+function buildCropGrid(gridId, hiddenId, previewId) {
+  const grid    = document.getElementById(gridId);
+  const hidden  = document.getElementById(hiddenId);
+  const preview = document.getElementById(previewId);
+  if (!grid) return;
+  const current = hidden ? hidden.value || 'center center' : 'center center';
+  grid.innerHTML = CROP_POSITIONS.map(({label, pos}) =>
+    `<button type="button" class="crop-btn${pos===current?' active':''}"
+      onclick="setCrop('${gridId}','${hiddenId}','${previewId}','${pos}')">${label}</button>`
+  ).join('');
+  if (preview) preview.style.objectPosition = current;
+}
+
+function setCrop(gridId, hiddenId, previewId, pos) {
+  const hidden  = document.getElementById(hiddenId);
+  const preview = document.getElementById(previewId);
+  if (hidden)  hidden.value = pos;
+  if (preview) preview.style.objectPosition = pos;
+  // Update active button
+  document.querySelectorAll(`#${gridId} .crop-btn`).forEach(btn => {
+    btn.classList.toggle('active', btn.textContent === CROP_POSITIONS.find(p=>p.pos===pos)?.label);
+  });
+}
+
 function previewPhoto() {
-  const file=document.getElementById('fPhoto').files[0];
-  const img=document.getElementById('fPhotoPreview');
-  if(file){ const r=new FileReader(); r.onload=e=>{img.src=e.target.result;img.classList.add('show');}; r.readAsDataURL(file); }
-  else img.classList.remove('show');
+  const file    = document.getElementById('fPhoto').files[0];
+  const img     = document.getElementById('fPhotoPreview');
+  const control = document.getElementById('fCropControl');
+  if (file) {
+    const r = new FileReader();
+    r.onload = e => {
+      img.src = e.target.result;
+      img.classList.add('show');
+      control.classList.add('show');
+      buildCropGrid('fCropGrid','fCropPos','fPhotoPreview');
+    };
+    r.readAsDataURL(file);
+  } else {
+    img.classList.remove('show');
+    control.classList.remove('show');
+  }
+}
+
+function previewShopPhoto() {
+  const file    = document.getElementById('sPhoto').files[0];
+  const img     = document.getElementById('sPhotoPreview');
+  const control = document.getElementById('sCropControl');
+  if (file) {
+    const r = new FileReader();
+    r.onload = e => {
+      img.src = e.target.result;
+      img.classList.add('show');
+      control.classList.add('show');
+      buildCropGrid('sCropGrid','sCropPos','sPhotoPreview');
+    };
+    r.readAsDataURL(file);
+  } else {
+    img.classList.remove('show');
+    control.classList.remove('show');
+  }
 }
 
 /* ─── IMAGE UTILS ────────────────────────────────────────── */
@@ -1144,8 +1230,9 @@ function renderShops() {
   }
 
   el.innerHTML = filtered.map((s,i) => {
+    const cropPos   = getCropPos(s.id);
     const photoHtml = s.photoUrl && s.photoUrl.trim()
-      ? `<img class="shop-photo" src="${esc(s.photoUrl)}" alt="${esc(s.name)}" loading="lazy" referrerpolicy="no-referrer" />`
+      ? `<img class="shop-photo" src="${esc(s.photoUrl)}" alt="${esc(s.name)}" loading="lazy" referrerpolicy="no-referrer" style="object-position:${cropPos}" />`
       : `<div class="shop-photo-placeholder">${SHOP_TYPE_EMOJI[s.shopType]||'🏪'}</div>`;
     const location = [s.city, s.state].filter(Boolean).join(', ');
     return `<div class="shop-card" style="animation-delay:${Math.min(i,8)*40}ms" onclick="openShopDetail('${esc(s.id)}')">
@@ -1203,8 +1290,19 @@ function openEditShop(id) {
   document.getElementById('sState').value   = s.state   || '';
   document.getElementById('sShopType').value = s.shopType || '';
   const prev = document.getElementById('sPhotoPreview');
-  if (s.photoUrl && s.photoUrl.trim()) { prev.src = s.photoUrl; prev.classList.add('show'); }
-  else prev.classList.remove('show');
+  if (s.photoUrl && s.photoUrl.trim()) {
+    prev.src = s.photoUrl;
+    prev.classList.add('show');
+    const savedCrop = s.cropPos || 'center center';
+    document.getElementById('sCropPos').value = savedCrop;
+    prev.style.objectPosition = savedCrop;
+    document.getElementById('sCropControl').classList.add('show');
+    buildCropGrid('sCropGrid','sCropPos','sPhotoPreview');
+  } else {
+    prev.classList.remove('show');
+    document.getElementById('sCropControl').classList.remove('show');
+    document.getElementById('sCropPos').value = 'center center';
+  }
   document.getElementById('sPhoto').value = '';
   _skipShopReset = true;
   navTo('page-shop-add');
@@ -1234,12 +1332,15 @@ async function submitShop() {
     notes:         document.getElementById('sNotes').value.trim(),
     photo:         photoB64,
     existingPhoto: document.getElementById('sExistingPhoto').value,
+    cropPos:       document.getElementById('sCropPos').value || 'center center',
   };
 
   try {
     const resp = await fetch(CONFIG.WEB_APP_URL, { method:'POST', body: JSON.stringify(payload) });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
+    const savedId = data.id || editId;
+    if (savedId) setCropPos(savedId, payload.cropPos);
     showToast(editId ? '✏️ Shop updated!' : '🏪 Shop added!','success');
     navBack();
     await loadShops();
@@ -1267,18 +1368,13 @@ function resetShopForm() {
   document.getElementById('shopSaveBtn').textContent   = '🏪 Save Shop';
   document.getElementById('sEditId').value        = '';
   document.getElementById('sExistingPhoto').value = '';
+  document.getElementById('sCropPos').value        = 'center center';
   ['sName','sCity','sAddress','sNotes'].forEach(id => document.getElementById(id).value='');
   document.getElementById('sState').value    = '';
   document.getElementById('sShopType').value = '';
   document.getElementById('sPhoto').value    = '';
   document.getElementById('sPhotoPreview').classList.remove('show');
-}
-
-function previewShopPhoto() {
-  const file = document.getElementById('sPhoto').files[0];
-  const img  = document.getElementById('sPhotoPreview');
-  if (file) { const r=new FileReader(); r.onload=e=>{img.src=e.target.result;img.classList.add('show');}; r.readAsDataURL(file); }
-  else img.classList.remove('show');
+  document.getElementById('sCropControl').classList.remove('show');
 }
 
 /* ─── UTILS ──────────────────────────────────────────────── */
