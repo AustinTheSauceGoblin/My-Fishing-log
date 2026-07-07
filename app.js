@@ -372,6 +372,11 @@ function toggleFav(id, e) {
   renderFavs();
   renderCatches(filtered);
   renderStats(filtered);
+  // Also refresh the all-favs page if it's currently visible
+  const allFavsPage = document.getElementById('page-all-favs');
+  if (allFavsPage && allFavsPage.classList.contains('active')) {
+    prepAllFavs();
+  }
 }
 
 function renderFavs() {
@@ -406,12 +411,22 @@ function renderFavs() {
 
   el.innerHTML = shown.map((c,i) => buildCatchCard(c,i,true)).join('');
 
-  // Show footer buttons only if there are more favs than the page size
-  const hasMore = allFavCatches.length > pageSize;
-  if (footer) footer.style.display = hasMore ? 'flex' : 'none';
+  // Show footer if: more favs than page size OR pinned selection hides some catches
+  const hasPinnedHidden = pinned && Array.isArray(pinned) && allFavCatches.length > shown.length;
+  const hasMore         = allFavCatches.length > pageSize;
+  const showFooter      = hasMore || hasPinnedHidden;
+
+  if (footer) footer.style.display = showFooter ? 'flex' : 'none';
   if (count) {
-    const label = pinned ? `${shown.length} pinned · ${allFavCatches.length} total` : `Showing ${shown.length} of ${allFavCatches.length} favorites`;
-    count.textContent = hasMore ? label : `${allFavCatches.length} favorite${allFavCatches.length !== 1 ? 's' : ''}`;
+    if (hasPinnedHidden && !hasMore) {
+      count.textContent = `${shown.length} pinned shown · ${allFavCatches.length} total favorites`;
+    } else if (hasMore) {
+      count.textContent = pinned && pinned.length
+        ? `${shown.length} pinned · ${allFavCatches.length} total`
+        : `Showing ${shown.length} of ${allFavCatches.length} favorites`;
+    } else {
+      count.textContent = `${allFavCatches.length} favorite${allFavCatches.length !== 1 ? 's' : ''}`;
+    }
   }
 }
 
