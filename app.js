@@ -78,13 +78,15 @@ function lsTimestampKey(k) { return k + '_ts'; }
 function getSettings() { return ls.get(pfx()+'settings', {}); }
 function getTackle()   { return ls.get(pfx()+'tackle',   []); }
 function getRods()     { return ls.get(pfx()+'rods',     []); }
-function getFavs()     { return ls.get(pfx()+'favs',     []); }
+function getFavs()       { return ls.get(pfx()+'favs',       []); }
+function getPinnedFavs() { return ls.get(pfx()+'pinnedfavs', null); } // null = not customised yet
 
 // Sheet key mapping (sheet keys are short, human-readable)
 const SHEET_KEY_MAP = {
   get [pfx()+'tackle']()   { return 'tackle'; },
   get [pfx()+'rods']()     { return 'rods'; },
-  get [pfx()+'favs']()     { return 'favorites'; },
+  get [pfx()+'favs']()        { return 'favorites'; },
+  get [pfx()+'pinnedfavs']()  { return 'pinnedfavs'; },
   get [pfx()+'settings']() { return 'settings'; },
   get [pfx()+'crops']()    { return 'crops'; },
 };
@@ -97,7 +99,8 @@ function setSynced(localKey, value) {
 }
 function saveTackle(a)         { setSynced(pfx()+'tackle',   a); }
 function saveRods(a)           { setSynced(pfx()+'rods',     a); }
-function saveFavs(a)           { setSynced(pfx()+'favs',     a); }
+function saveFavs(a)           { setSynced(pfx()+'favs',       a); }
+function savePinnedFavsLS(arr) { setSynced(pfx()+'pinnedfavs', arr); }
 function saveSettingsLocal(obj){ setSynced(pfx()+'settings', obj); }
 
 
@@ -108,7 +111,7 @@ let _syncTimer   = null;
 
 function queueSyncPush(localKey, value) {
   if (!CONFIG.WEB_APP_URL) return;
-  const sheetKey = { [pfx()+'tackle']:'tackle', [pfx()+'rods']:'rods', [pfx()+'favs']:'favorites', [pfx()+'settings']:'settings', [pfx()+'crops']:'crops' }[localKey];
+  const sheetKey = { [pfx()+'tackle']:'tackle', [pfx()+'rods']:'rods', [pfx()+'favs']:'favorites', [pfx()+'pinnedfavs']:'pinnedfavs', [pfx()+'settings']:'settings', [pfx()+'crops']:'crops' }[localKey];
   if (!sheetKey) return;
   _syncPending[sheetKey] = value;
   clearTimeout(_syncTimer);
@@ -148,7 +151,8 @@ async function pullAndMergeAppData() {
     const sheetToLocal = {
       tackle:    pfx()+'tackle',
       rods:      pfx()+'rods',
-      favorites: pfx()+'favs',
+      favorites:   pfx()+'favs',
+      pinnedfavs:  pfx()+'pinnedfavs',
       settings:  pfx()+'settings',
       crops:     pfx()+'crops',
     };
@@ -218,6 +222,7 @@ function navTo(pageId) {
   if (pageId === 'page-spots')       prepSpotsPage();
   if (pageId === 'page-all-catches') prepAllCatches();
   if (pageId === 'page-all-favs')    prepAllFavs();
+  if (pageId === 'page-pin-favs')    prepPinFavs();
   if (pageId === 'page-tackle')      renderTackleList();
   if (pageId === 'page-rods')        renderRodList();
   if (pageId === 'page-shops')       { renderShops(); populateShopStateFilter(); }
@@ -374,23 +379,40 @@ function renderFavs() {
   const footer = document.getElementById('favLogFooter');
   const count  = document.getElementById('favLogCount');
   const favs   = getFavs();
-  const favCatches = allCatches.filter(c => favs.includes(String(c.id)));
+  const pageSize = getCatchPageSize();
 
-  if (!favCatches.length) {
+  // All favorited catches sorted newest first
+  const allFavCatches = allCatches
+    .filter(c => favs.includes(String(c.id)))
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  if (!allFavCatches.length) {
     el.innerHTML = `<div class="empty-state"><div class="fish-big">🤍</div><h3>No favorites yet</h3><p>Tap the ♡ on any catch to add it here.</p></div>`;
     if (footer) footer.style.display = 'none';
     if (count)  count.textContent = '';
     return;
   }
 
-  const sorted   = [...favCatches].sort((a,b) => new Date(b.date)-new Date(a.date));
-  const pageSize = getCatchPageSize();
-  el.innerHTML   = sorted.slice(0, pageSize).map((c,i) => buildCatchCard(c,i,true)).join('');
+  // If user has customised pinned favs, show only those (up to pageSize)
+  // Otherwise show the most recent up to pageSize
+  const pinned = getPinnedFavs();
+  let shown;
+  if (pinned && Array.isArray(pinned) && pinned.length > 0) {
+    const pinnedSet = new Set(pinned.map(String));
+    shown = allFavCatches.filter(c => pinnedSet.has(String(c.id))).slice(0, pageSize);
+  } else {
+    shown = allFavCatches.slice(0, pageSize);
+  }
 
-  if (footer) footer.style.display = sorted.length > pageSize ? 'flex' : 'none';
-  if (count)  count.textContent    = sorted.length > pageSize
-    ? `Showing ${pageSize} of ${sorted.length} favorites`
-    : `${sorted.length} favorite${sorted.length !== 1 ? 's' : ''}`;
+  el.innerHTML = shown.map((c,i) => buildCatchCard(c,i,true)).join('');
+
+  // Show footer buttons only if there are more favs than the page size
+  const hasMore = allFavCatches.length > pageSize;
+  if (footer) footer.style.display = hasMore ? 'flex' : 'none';
+  if (count) {
+    const label = pinned ? `${shown.length} pinned · ${allFavCatches.length} total` : `Showing ${shown.length} of ${allFavCatches.length} favorites`;
+    count.textContent = hasMore ? label : `${allFavCatches.length} favorite${allFavCatches.length !== 1 ? 's' : ''}`;
+  }
 }
 
 function prepAllFavs() {
@@ -399,6 +421,78 @@ function prepAllFavs() {
   const sorted     = [...favCatches].sort((a,b) => new Date(b.date)-new Date(a.date));
   document.getElementById('allFavsTitle').textContent = `All Favorites (${sorted.length})`;
   document.getElementById('allFavsBody').innerHTML = sorted.map((c,i) => buildCatchCard(c,i,true)).join('');
+}
+
+// Temp selection state for the pin page
+let _pinSelection = new Set();
+
+function prepPinFavs() {
+  const favs      = getFavs();
+  const pageSize  = getCatchPageSize();
+  const pinned    = getPinnedFavs();
+  const favCatches = allCatches
+    .filter(c => favs.includes(String(c.id)))
+    .sort((a,b) => new Date(b.date)-new Date(a.date));
+
+  // Pre-select currently pinned, or most recent up to pageSize
+  if (pinned && Array.isArray(pinned) && pinned.length) {
+    _pinSelection = new Set(pinned.map(String));
+  } else {
+    _pinSelection = new Set(favCatches.slice(0, pageSize).map(c => String(c.id)));
+  }
+
+  document.getElementById('pinLimitBar').textContent =
+    `Select up to ${pageSize} favorites to show on the home screen. ${_pinSelection.size}/${pageSize} selected.`;
+
+  renderPinList(favCatches, pageSize);
+}
+
+function renderPinList(favCatches, pageSize) {
+  const el = document.getElementById('pinFavsList');
+  el.innerHTML = favCatches.map(c => {
+    const sel      = _pinSelection.has(String(c.id));
+    const atLimit  = _pinSelection.size >= pageSize && !sel;
+    const dt       = c.date ? new Date(c.date).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) : '';
+    const thumb    = c.photoUrl && c.photoUrl.trim()
+      ? `<img class="pin-fav-thumb" src="${esc(c.photoUrl)}" referrerpolicy="no-referrer" />`
+      : `<div class="pin-fav-thumb-placeholder">${getFishEmoji(c.fish)}</div>`;
+    return `<div class="pin-fav-item${sel?' selected':''}${atLimit?' disabled':''}"
+        onclick="togglePinFav('${esc(c.id)}',${pageSize})">
+      ${thumb}
+      <div class="pin-fav-info">
+        <div class="pin-fav-name">${esc(c.fish||'—')}</div>
+        <div class="pin-fav-meta">${[c.weight?parseFloat(c.weight).toFixed(2)+' lb':'',c.location,dt].filter(Boolean).join(' · ')}</div>
+      </div>
+      <div class="pin-fav-check">${sel?'✓':''}</div>
+    </div>`;
+  }).join('');
+}
+
+function togglePinFav(id, pageSize) {
+  const sid = String(id);
+  if (_pinSelection.has(sid)) {
+    _pinSelection.delete(sid);
+  } else {
+    if (_pinSelection.size >= pageSize) {
+      showToast(`You can only pin ${pageSize} favorites. Unselect one first.`, 'error');
+      return;
+    }
+    _pinSelection.add(sid);
+  }
+  document.getElementById('pinLimitBar').textContent =
+    `Select up to ${pageSize} favorites to show on the home screen. ${_pinSelection.size}/${pageSize} selected.`;
+  const favs      = getFavs();
+  const favCatches = allCatches
+    .filter(c => favs.includes(String(c.id)))
+    .sort((a,b) => new Date(b.date)-new Date(a.date));
+  renderPinList(favCatches, pageSize);
+}
+
+function savePinnedFavs() {
+  savePinnedFavsLS([..._pinSelection]);
+  showToast('Pinned favorites saved!', 'success');
+  navBack();
+  renderFavs();
 }
 
 /* ═══════════════════════════════════════════════════════════

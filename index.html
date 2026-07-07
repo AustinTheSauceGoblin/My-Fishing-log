@@ -151,8 +151,20 @@
     .catch-tap-hint { font-family: 'DM Mono', monospace; font-size: .58rem; color: #ccc; margin-top: 7px; }
     .fav-card { border-color: rgba(217,79,79,.25); }
     .fav-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,var(--heart),#e87a7a); }
-    .catch-log-footer { display: flex; justify-content: center; margin: 16px 0 4px; }
+    .catch-log-footer { display: flex; justify-content: center; gap: 10px; margin: 16px 0 4px; flex-wrap: wrap; }
     .catch-log-count { font-family: 'DM Mono', monospace; font-size: .72rem; color: #aaa; text-align: center; margin: 8px 0; }
+    /* Pin favorites selector */
+    .pin-fav-item { display: flex; align-items: center; gap: 12px; background: #fff; border-radius: 10px; padding: 10px 14px; border: 2px solid var(--line); margin-bottom: 8px; cursor: pointer; transition: border-color .15s; }
+    .pin-fav-item.selected { border-color: var(--heart); background: #fff8f8; }
+    .pin-fav-item.disabled { opacity: .45; cursor: not-allowed; }
+    .pin-fav-check { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #ddd; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: .85rem; transition: all .15s; }
+    .pin-fav-item.selected .pin-fav-check { background: var(--heart); border-color: var(--heart); color: #fff; }
+    .pin-fav-info { flex: 1; min-width: 0; }
+    .pin-fav-name { font-family: 'Playfair Display', serif; font-weight: 700; font-size: .95rem; }
+    .pin-fav-meta { font-family: 'DM Mono', monospace; font-size: .66rem; color: var(--water); margin-top: 2px; }
+    .pin-fav-thumb { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; flex-shrink: 0; background: #d8eaf2; }
+    .pin-fav-thumb-placeholder { width: 48px; height: 48px; border-radius: 8px; background: linear-gradient(135deg,#e8f4f8,#d0e8f0); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; flex-shrink: 0; }
+    .pin-limit-bar { font-family: 'DM Mono', monospace; font-size: .74rem; color: var(--water-dk); background: var(--parchment); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; border: 1px solid var(--line); }
 
     /* ── EMPTY ── */
     .empty-state { text-align: center; padding: 40px 20px; color: #aaa; grid-column: 1/-1; }
@@ -346,6 +358,7 @@
     <div class="catch-log-count" id="favLogCount" style="margin:8px 16px 0"></div>
     <div class="catch-log-footer" id="favLogFooter" style="display:none">
       <button class="btn btn-outline" onclick="navTo('page-all-favs')">❤️ View All Favorites</button>
+      <button class="btn btn-outline" onclick="navTo('page-pin-favs')">✏️ Edit Shown</button>
     </div>
 
     <div class="section-title">Catch Log</div>
@@ -494,6 +507,24 @@
     </div>
     <div class="page-content">
       <div class="catch-grid" id="allFavsBody"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ PIN FAVORITES PAGE ════════════════════ -->
+  <div class="page" id="page-pin-favs">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="navBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Back
+      </button>
+      <span class="nav-title">Choose Shown Favorites</span>
+    </div>
+    <div class="page-content" style="max-width:600px">
+      <div class="pin-limit-bar" id="pinLimitBar"></div>
+      <div id="pinFavsList"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px">
+        <button class="btn btn-primary" onclick="savePinnedFavs()">💾 Save</button>
+      </div>
     </div>
   </div>
 
