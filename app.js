@@ -453,24 +453,36 @@ function prepPinFavs() {
     .filter(c => favs.includes(String(c.id)))
     .sort((a,b) => new Date(b.date)-new Date(a.date));
 
-  // Pre-select currently pinned, or most recent up to pageSize
+  // Pre-select currently pinned list if it exists,
+  // otherwise pre-select the most recent up to pageSize
   if (pinned && Array.isArray(pinned) && pinned.length) {
-    _pinSelection = new Set(pinned.map(String));
+    // Only keep IDs that are still favorites (catch may have been unfavorited)
+    const validIds = new Set(favCatches.map(c => String(c.id)));
+    _pinSelection = new Set(pinned.map(String).filter(id => validIds.has(id)));
   } else {
     _pinSelection = new Set(favCatches.slice(0, pageSize).map(c => String(c.id)));
   }
 
-  document.getElementById('pinLimitBar').textContent =
-    `Select up to ${pageSize} favorites to show on the home screen. ${_pinSelection.size}/${pageSize} selected.`;
-
+  updatePinLimitBar(pageSize);
   renderPinList(favCatches, pageSize);
+}
+
+function updatePinLimitBar(pageSize) {
+  const el = document.getElementById('pinLimitBar');
+  if (!el) return;
+  const remaining = pageSize - _pinSelection.size;
+  if (remaining <= 0) {
+    el.textContent = `Limit reached — ${pageSize}/${pageSize} selected. Deselect one to swap.`;
+  } else {
+    el.textContent = `Select up to ${pageSize} favorites to show on the home screen. ${_pinSelection.size}/${pageSize} selected.`;
+  }
 }
 
 function renderPinList(favCatches, pageSize) {
   const el = document.getElementById('pinFavsList');
   el.innerHTML = favCatches.map(c => {
     const sel      = _pinSelection.has(String(c.id));
-    const atLimit  = _pinSelection.size >= pageSize && !sel;
+    const atLimit  = _pinSelection.size > pageSize - 1 && !sel;
     const dt       = c.date ? new Date(c.date).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) : '';
     const thumb    = c.photoUrl && c.photoUrl.trim()
       ? `<img class="pin-fav-thumb" src="${esc(c.photoUrl)}" referrerpolicy="no-referrer" />`
@@ -492,14 +504,14 @@ function togglePinFav(id, pageSize) {
   if (_pinSelection.has(sid)) {
     _pinSelection.delete(sid);
   } else {
-    if (_pinSelection.size >= pageSize) {
-      showToast(`You can only pin ${pageSize} favorites. Unselect one first.`, 'error');
+    if (_pinSelection.size > pageSize - 1) {
+      // Already at the limit — block and show message
+      showToast(`You can only pin ${pageSize} favorites. Deselect one first.`, 'error');
       return;
     }
     _pinSelection.add(sid);
   }
-  document.getElementById('pinLimitBar').textContent =
-    `Select up to ${pageSize} favorites to show on the home screen. ${_pinSelection.size}/${pageSize} selected.`;
+  updatePinLimitBar(pageSize);
   const favs      = getFavs();
   const favCatches = allCatches
     .filter(c => favs.includes(String(c.id)))
