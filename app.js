@@ -398,14 +398,18 @@ function renderFavs() {
     return;
   }
 
-  // If user has customised pinned favs, show only those (up to pageSize)
-  // Otherwise show the most recent up to pageSize
+  // If total favorites fit within page size, show them all — no need for pinning
   const pinned = getPinnedFavs();
   let shown;
-  if (pinned && Array.isArray(pinned) && pinned.length > 0) {
+  if (allFavCatches.length <= pageSize) {
+    // Fits on screen — show everything, pinned list irrelevant
+    shown = allFavCatches;
+  } else if (pinned && Array.isArray(pinned) && pinned.length > 0) {
+    // More than fit — use the pinned selection
     const pinnedSet = new Set(pinned.map(String));
     shown = allFavCatches.filter(c => pinnedSet.has(String(c.id))).slice(0, pageSize);
   } else {
+    // More than fit but no pinned selection yet — show most recent
     shown = allFavCatches.slice(0, pageSize);
   }
 
