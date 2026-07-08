@@ -407,7 +407,16 @@ function renderFavs() {
   } else if (pinned && Array.isArray(pinned) && pinned.length > 0) {
     // More than fit — use the pinned selection
     const pinnedSet = new Set(pinned.map(String));
-    shown = allFavCatches.filter(c => pinnedSet.has(String(c.id))).slice(0, pageSize);
+    let pinnedShown = allFavCatches.filter(c => pinnedSet.has(String(c.id)));
+    // If saved pinned list has fewer than pageSize (e.g. saved before a bug fix),
+    // fill remaining slots with the newest non-pinned favs
+    if (pinnedShown.length < pageSize) {
+      const extra = allFavCatches
+        .filter(c => !pinnedSet.has(String(c.id)))
+        .slice(0, pageSize - pinnedShown.length);
+      pinnedShown = [...pinnedShown, ...extra];
+    }
+    shown = pinnedShown.slice(0, pageSize);
   } else {
     // More than fit but no pinned selection yet — show most recent
     shown = allFavCatches.slice(0, pageSize);
@@ -453,13 +462,14 @@ function prepPinFavs() {
     .filter(c => favs.includes(String(c.id)))
     .sort((a,b) => new Date(b.date)-new Date(a.date));
 
-  // Pre-select currently pinned list if it exists,
+  // Pre-select currently pinned list if it exists and is full-sized,
   // otherwise pre-select the most recent up to pageSize
-  if (pinned && Array.isArray(pinned) && pinned.length) {
-    // Only keep IDs that are still favorites (catch may have been unfavorited)
+  if (pinned && Array.isArray(pinned) && pinned.length >= pageSize) {
+    // Valid saved list — filter to only still-favorited catches
     const validIds = new Set(favCatches.map(c => String(c.id)));
     _pinSelection = new Set(pinned.map(String).filter(id => validIds.has(id)));
   } else {
+    // No saved list, or saved list is undersized (old bug) — start fresh with most recent
     _pinSelection = new Set(favCatches.slice(0, pageSize).map(c => String(c.id)));
   }
 
