@@ -1215,21 +1215,47 @@ function openDetail(id) {
   const photoHtml = c.photoUrl&&c.photoUrl.trim()
     ? `<img class="detail-photo" src="${esc(c.photoUrl)}" alt="${esc(c.fish)}" referrerpolicy="no-referrer" />`
     : `<div class="detail-photo-placeholder">${getFishEmoji(c.fish)}</div>`;
+
+  // Calculate sunrise/sunset for this specific catch
+  let sunriseStr = '—', sunsetStr = '—', sunRelStr = '';
+  if (c.date && hasTime(c) && c.state) {
+    const d = new Date(c.date);
+    const sun = getSunTimes(d, c.state);
+    if (sun) {
+      sunriseStr = minsToTimeStr(sun.sunrise);
+      sunsetStr  = minsToTimeStr(sun.sunset);
+      const catchMins = d.getHours()*60 + d.getMinutes();
+      if (catchMins < sun.sunrise) {
+        sunRelStr = `🌙 ${minsToRelStr(sun.sunrise - catchMins)} before sunrise`;
+      } else if (catchMins < sun.sunset) {
+        const afterSunrise = catchMins - sun.sunrise;
+        const beforeSunset = sun.sunset - catchMins;
+        sunRelStr = `☀️ ${minsToRelStr(afterSunrise)} after sunrise · ${minsToRelStr(beforeSunset)} before sunset`;
+      } else {
+        sunRelStr = `🌙 ${minsToRelStr(catchMins - sun.sunset)} after sunset`;
+      }
+    }
+  }
+
   const fields = [
     {label:'Weight',      value: c.weight?parseFloat(c.weight).toFixed(2)+' lbs':'—'},
     {label:'Date & Time', value: dt},
     {label:'State',       value: c.state?`${STATE_EMOJI[c.state]||'📍'} ${c.state}`:'—'},
     {label:'Location',    value: c.location||'—'},
+    {label:'Sunrise',     value: sunriseStr},
+    {label:'Sunset',      value: sunsetStr},
     {label:'Lure / Bait', value: c.lure||'—'},
     {label:'Rod',         value: c.rod||'—'},
     {label:'Fished With', value: c.fishWith||'—'},
     {label:'Trip',        value: c.trip||'—'},
   ];
+
   document.getElementById('detailPageBody').innerHTML = `
     ${photoHtml}
     <div class="page-content">
       <div class="detail-fish-name">${esc(c.fish||'—')}</div>
       <div class="detail-grid">${fields.map(f=>`<div class="detail-item"><div class="detail-item-label">${f.label}</div><div class="detail-item-value">${esc(f.value)}</div></div>`).join('')}</div>
+      ${sunRelStr ? `<div class="detail-notes" style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--water-dk)">${esc(sunRelStr)}</div>` : ''}
       ${c.notes?`<div class="detail-notes"><div class="detail-item-label" style="margin-bottom:5px">Notes</div>${esc(c.notes)}</div>`:''}
       <div class="detail-actions">
         <button class="btn btn-outline" onclick="openEditCatch('${esc(c.id)}')">✏️ Edit</button>
