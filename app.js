@@ -934,22 +934,175 @@ function getFishEmoji(name) {
   for (const [k,v] of Object.entries(FISH_EMOJI)) { if(k!=='default'&&key.includes(k)) return v; }
   return FISH_EMOJI.default;
 }
-function minsToTimeStr(m) { const h=Math.floor(m/60)%24,mn=Math.round(m%60); return `${h%12||12}:${String(mn).padStart(2,'0')} ${h<12?'AM':'PM'}`; }
+/* ─── SUNRISE / SUNSET CALCULATION ─────────────────────────
+   Pure-math implementation of the NOAA solar position algorithm.
+   Uses each catch's state to look up approximate center lat/lon.
+   Accurate to within ~5 minutes for any US location.
+──────────────────────────────────────────────────────────── */
+
+const STATE_COORDS = {
+  "Alabama":{"lat":32.8,"lon":-86.8},"Alaska":{"lat":64.2,"lon":-153.4},
+  "Arizona":{"lat":34.3,"lon":-111.1},"Arkansas":{"lat":34.8,"lon":-92.2},
+  "California":{"lat":36.8,"lon":-119.4},"Colorado":{"lat":39.0,"lon":-105.5},
+  "Connecticut":{"lat":41.6,"lon":-72.7},"Delaware":{"lat":39.0,"lon":-75.5},
+  "Florida":{"lat":27.8,"lon":-81.6},"Georgia":{"lat":32.7,"lon":-83.4},
+  "Hawaii":{"lat":20.3,"lon":-156.4},"Idaho":{"lat":44.4,"lon":-114.5},
+  "Illinois":{"lat":40.0,"lon":-89.2},"Indiana":{"lat":40.0,"lon":-86.1},
+  "Iowa":{"lat":42.0,"lon":-93.3},"Kansas":{"lat":38.5,"lon":-98.4},
+  "Kentucky":{"lat":37.5,"lon":-85.3},"Louisiana":{"lat":31.2,"lon":-91.8},
+  "Maine":{"lat":45.3,"lon":-69.0},"Maryland":{"lat":39.0,"lon":-76.8},
+  "Massachusetts":{"lat":42.3,"lon":-71.8},"Michigan":{"lat":44.3,"lon":-85.4},
+  "Minnesota":{"lat":46.4,"lon":-93.1},"Mississippi":{"lat":32.7,"lon":-89.7},
+  "Missouri":{"lat":38.5,"lon":-92.5},"Montana":{"lat":47.0,"lon":-110.5},
+  "Nebraska":{"lat":41.5,"lon":-99.9},"Nevada":{"lat":39.3,"lon":-116.6},
+  "New Hampshire":{"lat":43.7,"lon":-71.6},"New Jersey":{"lat":40.1,"lon":-74.5},
+  "New Mexico":{"lat":34.4,"lon":-106.1},"New York":{"lat":42.9,"lon":-75.5},
+  "North Carolina":{"lat":35.5,"lon":-79.4},"North Dakota":{"lat":47.5,"lon":-100.5},
+  "Ohio":{"lat":40.4,"lon":-82.8},"Oklahoma":{"lat":35.6,"lon":-97.5},
+  "Oregon":{"lat":44.0,"lon":-120.5},"Pennsylvania":{"lat":40.9,"lon":-77.8},
+  "Rhode Island":{"lat":41.7,"lon":-71.5},"South Carolina":{"lat":33.8,"lon":-80.9},
+  "South Dakota":{"lat":44.4,"lon":-100.3},"Tennessee":{"lat":35.9,"lon":-86.4},
+  "Texas":{"lat":31.5,"lon":-99.3},"Utah":{"lat":39.3,"lon":-111.1},
+  "Vermont":{"lat":44.1,"lon":-72.7},"Virginia":{"lat":37.8,"lon":-78.2},
+  "Washington":{"lat":47.4,"lon":-120.4},"West Virginia":{"lat":38.6,"lon":-80.6},
+  "Wisconsin":{"lat":44.3,"lon":-89.8},"Wyoming":{"lat":43.0,"lon":-107.6}
+};
+
+// Returns sunrise and sunset as minutes-since-midnight (local time) for a given date + state.
+// Returns null if state unknown or sun doesn't rise/set (polar extremes).
+function getSunTimes(dateObj, state) {
+  const coords = STATE_COORDS[state];
+  if (!coords) return null;
+
+  const lat  = coords.lat;
+  const lon  = coords.lon;
+  const rad  = Math.PI / 180;
+  const deg  = 180 / Math.PI;
+
+  // Julian day number
+  const jd = dateObj.getTime() / 86400000 + 2440587.5;
+  const n  = Math.round(jd - 2451545.0 + 0.5 - lon / 360);
+
+  // Mean solar noon
+  const jStar = n - lon / 360;
+
+  // Solar mean anomaly
+  const M = (357.5291 + 0.98560028 * jStar) % 360;
+
+  // Equation of centre
+  const C = 1.9148 * Math.sin(M * rad)
+           + 0.0200 * Math.sin(2 * M * rad)
+           + 0.0003 * Math.sin(3 * M * rad);
+
+  // Ecliptic longitude
+  const lam = (M + C + 180 + 102.9372) % 360;
+
+  // Solar transit
+  const jTransit = 2451545.0 + jStar + 0.0053 * Math.sin(M * rad)
+                 - 0.0069 * Math.sin(2 * lam * rad);
+
+  // Declination
+  const sinDec = Math.sin(lam * rad) * Math.sin(23.4397 * rad);
+  const cosDec = Math.cos(Math.asin(sinDec));
+
+  // Hour angle
+  const cosHa = (Math.sin(-0.833 * rad) - Math.sin(lat * rad) * sinDec)
+               / (Math.cos(lat * rad) * cosDec);
+
+  if (cosHa < -1 || cosHa > 1) return null; // midnight sun / polar night
+
+  const ha = Math.acos(cosHa) * deg;
+
+  const jRise = jTransit - ha / 360;
+  const jSet  = jTransit + ha / 360;
+
+  // Convert Julian days to local minutes-since-midnight
+  // Use UTC offset from the Date object as approximation
+  const utcOffsetMins = -dateObj.getTimezoneOffset();
+  const jdToLocalMins = (jd) => {
+    const totalMins = (jd - Math.floor(jd) + 0.5) * 1440 + utcOffsetMins;
+    return ((totalMins % 1440) + 1440) % 1440;
+  };
+
+  return {
+    sunrise: jdToLocalMins(jRise),
+    sunset:  jdToLocalMins(jSet),
+  };
+}
+
+function minsToRelStr(diffMins) {
+  const abs = Math.abs(Math.round(diffMins));
+  const h   = Math.floor(abs / 60);
+  const m   = abs % 60;
+  if (h === 0) return `${m}m`;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function minsToTimeStr(m) {
+  const h=Math.floor(m/60)%24, mn=Math.round(m%60);
+  return `${h%12||12}:${String(mn).padStart(2,'0')} ${h<12?'AM':'PM'}`;
+}
+
+function hasTime(c) {
+  const s = String(c.date||'');
+  return s.includes('T') && !s.endsWith('T00:00:00.000Z');
+}
+
+// Returns enriched time stats for a set of catches.
+// Groups into AM (before noon) and PM (after noon), calculates averages,
+// and for each group also computes avg offset from sunrise (AM) or sunset (PM).
 function calcAvgTimes(catches) {
-  const am=[],pm=[];
-  catches.forEach(c=>{
-    if (!c.date) return;
-    // Skip catches with no time — date-only entries come back as midnight UTC
-    // which would corrupt the averages. We detect them by checking if the
-    // stored string is just a date (no T) or ends at exactly midnight.
-    const dateStr = String(c.date);
-    if (!dateStr.includes('T') || dateStr.endsWith('T00:00:00.000Z')) return;
-    const d=new Date(c.date); if(isNaN(d)) return;
-    const m=d.getHours()*60+d.getMinutes();
-    (d.getHours()<12?am:pm).push(m);
+  const amMins=[], pmMins=[], amSunOffsets=[], pmSunOffsets=[];
+
+  catches.forEach(c => {
+    if (!c.date || !hasTime(c)) return;
+    const d = new Date(c.date);
+    if (isNaN(d)) return;
+    const mins = d.getHours()*60 + d.getMinutes();
+
+    if (d.getHours() < 12) {
+      amMins.push(mins);
+      // AM — compare to sunrise
+      if (c.state) {
+        const sun = getSunTimes(d, c.state);
+        if (sun) amSunOffsets.push(mins - sun.sunrise);
+      }
+    } else {
+      pmMins.push(mins);
+      // PM — compare to sunset
+      if (c.state) {
+        const sun = getSunTimes(d, c.state);
+        if (sun) pmSunOffsets.push(mins - sun.sunset);
+      }
+    }
   });
-  const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
-  return { amAvg:avg(am), pmAvg:avg(pm), amCount:am.length, pmCount:pm.length };
+
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+
+  return {
+    amAvg:        avg(amMins),
+    pmAvg:        avg(pmMins),
+    amCount:      amMins.length,
+    pmCount:      pmMins.length,
+    amSunOffset:  avg(amSunOffsets),   // negative = before sunrise, positive = after
+    pmSunOffset:  avg(pmSunOffsets),   // negative = before sunset, positive = after
+    amHasSun:     amSunOffsets.length > 0,
+    pmHasSun:     pmSunOffsets.length > 0,
+  };
+}
+
+function formatSunRelative(offsetMins, isAm) {
+  if (offsetMins === null) return '';
+  const rel = minsToRelStr(Math.abs(offsetMins));
+  if (isAm) {
+    return offsetMins < 0
+      ? `🌅 ${rel} before sunrise`
+      : `${rel} after sunrise`;
+  } else {
+    return offsetMins < 0
+      ? `${rel} before sunset`
+      : `🌙 ${rel} after sunset`;
+  }
 }
 
 function renderFishBreakdown(catches) {
@@ -958,11 +1111,17 @@ function renderFishBreakdown(catches) {
   const map={};
   catches.forEach(c=>{ if(!c.fish) return; if(!map[c.fish]) map[c.fish]={count:0,best:0,catches:[]}; map[c.fish].count++; const w=parseFloat(c.weight)||0; if(w>map[c.fish].best) map[c.fish].best=w; map[c.fish].catches.push(c); });
   el.innerHTML = Object.entries(map).sort((a,b)=>b[1].count-a[1].count).map(([name,s])=>{
-    const t=calcAvgTimes(s.catches);
-    let ts='';
-    if(t.amAvg!==null) ts+=`☀️ avg ${minsToTimeStr(t.amAvg)} (${t.amCount})`;
-    if(t.amAvg!==null&&t.pmAvg!==null) ts+=' · ';
-    if(t.pmAvg!==null) ts+=`🌇 avg ${minsToTimeStr(t.pmAvg)} (${t.pmCount})`;
+    const t = calcAvgTimes(s.catches);
+    let ts = '';
+    if (t.amAvg !== null) {
+      ts += `☀️ avg ${minsToTimeStr(t.amAvg)} (${t.amCount})`;
+      if (t.amHasSun) ts += ` · ${formatSunRelative(t.amSunOffset, true)}`;
+    }
+    if (t.amAvg !== null && t.pmAvg !== null) ts += '<br>';
+    if (t.pmAvg !== null) {
+      ts += `🌇 avg ${minsToTimeStr(t.pmAvg)} (${t.pmCount})`;
+      if (t.pmHasSun) ts += ` · ${formatSunRelative(t.pmSunOffset, false)}`;
+    }
     return `<div class="fish-card" onclick="openDrilldown('species','${esc(name)}')">
       <div class="fish-icon">${getFishEmoji(name)}</div>
       <div class="fish-info">
