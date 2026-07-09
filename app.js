@@ -987,18 +987,39 @@ async function fetchSunForCity() {
     const lat = parseFloat(geoData[0].lat);
     const lon = parseFloat(geoData[0].lon);
 
-    // Step 2: Fetch sunrise/sunset from sunrise-sunset.org
+    // Step 2: Fetch sunrise/sunset using the location's correct timezone
+    // Pass tzid so the API returns local times, not UTC
+    const STATE_TZ = {
+      "Alabama":"America/Chicago","Alaska":"America/Anchorage","Arizona":"America/Phoenix",
+      "Arkansas":"America/Chicago","California":"America/Los_Angeles","Colorado":"America/Denver",
+      "Connecticut":"America/New_York","Delaware":"America/New_York","Florida":"America/New_York",
+      "Georgia":"America/New_York","Hawaii":"Pacific/Honolulu","Idaho":"America/Denver",
+      "Illinois":"America/Chicago","Indiana":"America/Indiana/Indianapolis","Iowa":"America/Chicago",
+      "Kansas":"America/Chicago","Kentucky":"America/New_York","Louisiana":"America/Chicago",
+      "Maine":"America/New_York","Maryland":"America/New_York","Massachusetts":"America/New_York",
+      "Michigan":"America/Detroit","Minnesota":"America/Chicago","Mississippi":"America/Chicago",
+      "Missouri":"America/Chicago","Montana":"America/Denver","Nebraska":"America/Chicago",
+      "Nevada":"America/Los_Angeles","New Hampshire":"America/New_York","New Jersey":"America/New_York",
+      "New Mexico":"America/Denver","New York":"America/New_York","North Carolina":"America/New_York",
+      "North Dakota":"America/Chicago","Ohio":"America/New_York","Oklahoma":"America/Chicago",
+      "Oregon":"America/Los_Angeles","Pennsylvania":"America/New_York","Rhode Island":"America/New_York",
+      "South Carolina":"America/New_York","South Dakota":"America/Chicago","Tennessee":"America/Chicago",
+      "Texas":"America/Chicago","Utah":"America/Denver","Vermont":"America/New_York",
+      "Virginia":"America/New_York","Washington":"America/Los_Angeles","West Virginia":"America/New_York",
+      "Wisconsin":"America/Chicago","Wyoming":"America/Denver"
+    };
     const catchDate = date ? date.slice(0, 10) : new Date().toISOString().slice(0, 10);
-    const sunResp   = await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${catchDate}&formatted=0`);
+    const tzid      = STATE_TZ[document.getElementById('fState').value] || 'America/New_York';
+    const sunResp   = await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${catchDate}&tzid=${encodeURIComponent(tzid)}&formatted=0`);
     const sunData   = await sunResp.json();
     if (sunData.status !== 'OK') throw new Error('Sunrise API error');
 
-    // Convert UTC ISO strings to local time strings HH:MM
+    // API now returns times in the location's local timezone — just extract HH:MM
     const toLocalTime = (isoStr) => {
-      const d = new Date(isoStr);
-      const h = String(d.getHours()).padStart(2,'0');
-      const m = String(d.getMinutes()).padStart(2,'0');
-      return `${h}:${m}`;
+      // isoStr is like "2026-05-05T20:14:00-06:00" — local time is in the string itself
+      const timePart = isoStr.split('T')[1];
+      const [h, m]   = timePart.split(':').map(Number);
+      return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
     };
 
     const sunriseLocal = toLocalTime(sunData.results.sunrise);
