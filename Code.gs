@@ -1,25 +1,32 @@
 // ═══════════════════════════════════════════════════════════
-//  FISHING LOG — Google Apps Script Backend  v5
+//  FISHING LOG — Google Apps Script Backend  v6
 //
 //  HOW TO UPDATE:
 //  1. Select ALL text (Ctrl+A) and delete it
 //  2. Paste this entire file
 //  3. Set YOUR_SHEET_ID_HERE to your actual Sheet ID
 //  4. Save, then Deploy → Manage Deployments → New version → Deploy
+//
+//  NEW COLUMNS in this version (City, Lat, Lon, Sunrise, Sunset):
+//  If you already have a Catches tab, add these 5 headers to
+//  columns M-Q in row 1: City | Lat | Lon | Sunrise | Sunset
+//  New catches will fill them automatically.
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_ID    = "10rqVPyLthOjmbVY0z9k8bPjidEKc7LK0nhCLo2pVY-s";
+const SHEET_ID    = "YOUR_SHEET_ID_HERE";
 const SHEET_TAB   = "Catches";
 const APPDATA_TAB = "AppData";
 const SHOPS_TAB   = "FishShops";
 
 const COLS = [
   "ID","Date","Fish","Weight_lbs","Location","State",
-  "Lure","Rod","FishWith","Trip","Notes","PhotoUrl"
+  "Lure","Rod","FishWith","Trip","Notes","PhotoUrl",
+  "City","Lat","Lon","Sunrise","Sunset"
 ];
 const COL = {
   ID:0,DATE:1,FISH:2,WEIGHT:3,LOCATION:4,STATE:5,
-  LURE:6,ROD:7,FISHWITH:8,TRIP:9,NOTES:10,PHOTOURL:11
+  LURE:6,ROD:7,FISHWITH:8,TRIP:9,NOTES:10,PHOTOURL:11,
+  CITY:12,LAT:13,LON:14,SUNRISE:15,SUNSET:16
 };
 
 const SHOP_COLS = ["ID","Name","Address","City","State","ShopType","Notes","PhotoUrl"];
@@ -82,6 +89,11 @@ function getCatches() {
     trip:     get(row,'trip'),
     notes:    get(row,'notes'),
     photoUrl: get(row,'photourl'),
+    city:     get(row,'city'),
+    lat:      get(row,'lat')  !== '' ? Number(get(row,'lat'))  : '',
+    lon:      get(row,'lon')  !== '' ? Number(get(row,'lon'))  : '',
+    sunrise:  get(row,'sunrise'),
+    sunset:   get(row,'sunset'),
   }));
   return { catches };
 }
@@ -98,6 +110,11 @@ function addCatch(data) {
   row[COL.LURE]=data.lure||''; row[COL.ROD]=data.rod||'';
   row[COL.FISHWITH]=data.fishWith||''; row[COL.TRIP]=data.trip||'';
   row[COL.NOTES]=data.notes||''; row[COL.PHOTOURL]=photoUrl;
+  row[COL.CITY]=data.city||'';
+  row[COL.LAT]=data.lat!==undefined&&data.lat!=='' ? data.lat : '';
+  row[COL.LON]=data.lon!==undefined&&data.lon!=='' ? data.lon : '';
+  row[COL.SUNRISE]=data.sunrise||'';
+  row[COL.SUNSET]=data.sunset||'';
   sheet.appendRow(row);
   return { success:true, id };
 }
@@ -123,6 +140,11 @@ function editCatch(data) {
     newRow[COL.TRIP]=data.trip!==undefined?(data.trip||''):'';
     newRow[COL.NOTES]=data.notes!==undefined?(data.notes||''):'';
     newRow[COL.PHOTOURL]=photoUrl;
+    newRow[COL.CITY]=data.city!==undefined?(data.city||''):(values[i][COL.CITY]||'');
+    newRow[COL.LAT]=data.lat!==undefined&&data.lat!=='' ? data.lat : (values[i][COL.LAT]||'');
+    newRow[COL.LON]=data.lon!==undefined&&data.lon!=='' ? data.lon : (values[i][COL.LON]||'');
+    newRow[COL.SUNRISE]=data.sunrise!==undefined?(data.sunrise||''):(values[i][COL.SUNRISE]||'');
+    newRow[COL.SUNSET]=data.sunset!==undefined?(data.sunset||''):(values[i][COL.SUNSET]||'');
     sheet.getRange(rowNum,1,1,COLS.length).setValues([newRow]);
     return { success:true };
   }

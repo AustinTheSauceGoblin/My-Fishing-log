@@ -288,6 +288,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   refreshLureDropdown();
   refreshRodDropdown();
 
+  // Fetch sunrise/sunset when city field loses focus or state changes
+  document.getElementById('fCity').addEventListener('blur', fetchSunForCity);
+  document.getElementById('fState').addEventListener('change', () => {
+    if (document.getElementById('fCity').value.trim()) fetchSunForCity();
+  });
+
   if (!CONFIG.WEB_APP_URL) {
     document.getElementById('configBanner').style.display = 'flex';
     renderEmptyStats();
@@ -797,6 +803,11 @@ async function submitCatch() {
     photo:         photoB64,
     existingPhoto: document.getElementById('fExistingPhoto').value,
     cropPos:       document.getElementById('fCropPos').value || 'center center',
+    city:          document.getElementById('fCity').value.trim(),
+    lat:           document.getElementById('fLat').value !== '' ? parseFloat(document.getElementById('fLat').value) : '',
+    lon:           document.getElementById('fLon').value !== '' ? parseFloat(document.getElementById('fLon').value) : '',
+    sunrise:       document.getElementById('fSunrise').value,
+    sunset:        document.getElementById('fSunset').value,
   };
 
   try {
@@ -863,6 +874,8 @@ function populateFilters() {
   if (buddyDL) { buddyDL.innerHTML = getBuddyStats().map(b=>`<option value="${esc(b.name)}">`).join(''); }
   const locDL = document.getElementById('locationSuggestions');
   if (locDL) { locDL.innerHTML = [...new Set(allCatches.map(c=>c.location).filter(Boolean).map(l=>l.trim()))].sort().map(s=>`<option value="${esc(s)}">`).join(''); }
+  const cityDL = document.getElementById('citySuggestions');
+  if (cityDL) { cityDL.innerHTML = [...new Set(allCatches.map(c=>c.city).filter(Boolean).map(c=>c.trim()))].sort().map(s=>`<option value="${esc(s)}">`).join(''); }
 }
 
 function applyFilters() {
@@ -934,6 +947,97 @@ function getFishEmoji(name) {
   for (const [k,v] of Object.entries(FISH_EMOJI)) { if(k!=='default'&&key.includes(k)) return v; }
   return FISH_EMOJI.default;
 }
+/* ─── GEOCODE + SUNRISE API ──────────────────────────────────
+   When a city is entered on the catch form:
+   1. Geocode city+state → lat/lon via OpenStreetMap Nominatim
+   2. Fetch exact sunrise/sunset from sunrise-sunset.org
+   3. Store in hidden form fields so they get saved with the catch
+   Falls back to pure-math state-center calculation for old catches
+   that don't have saved lat/lon/sunrise/sunset.
+──────────────────────────────────────────────────────────── */
+
+// Called when the City field loses focus
+async function fetchSunForCity() {
+  const city  = document.getElementById('fCity').value.trim();
+  const state = document.getElementById('fState').value;
+  const date  = document.getElementById('fNoTime').checked
+    ? document.getElementById('fDateOnly').value
+    : document.getElementById('fDate').value;
+
+  const preview = document.getElementById('sunPreview');
+
+  // Clear if no city entered
+  if (!city) {
+    preview.textContent = '';
+    ['fLat','fLon','fSunrise','fSunset'].forEach(id => document.getElementById(id).value = '');
+    return;
+  }
+
+  preview.textContent = '⏳ Looking up sunrise/sunset…';
+
+  try {
+    // Step 1: Geocode via OpenStreetMap Nominatim
+    const query    = encodeURIComponent(`${city}${state ? ', ' + state : ''}, USA`);
+    const geoResp  = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`, {
+      headers: { 'Accept-Language': 'en', 'User-Agent': 'FishingLog/1.0' }
+    });
+    const geoData  = await geoResp.json();
+    if (!geoData.length) throw new Error('City not found');
+
+    const lat = parseFloat(geoData[0].lat);
+    const lon = parseFloat(geoData[0].lon);
+
+    // Step 2: Fetch sunrise/sunset from sunrise-sunset.org
+    const catchDate = date ? date.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const sunResp   = await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${catchDate}&formatted=0`);
+    const sunData   = await sunResp.json();
+    if (sunData.status !== 'OK') throw new Error('Sunrise API error');
+
+    // Convert UTC ISO strings to local time strings HH:MM
+    const toLocalTime = (isoStr) => {
+      const d = new Date(isoStr);
+      const h = String(d.getHours()).padStart(2,'0');
+      const m = String(d.getMinutes()).padStart(2,'0');
+      return `${h}:${m}`;
+    };
+
+    const sunriseLocal = toLocalTime(sunData.results.sunrise);
+    const sunsetLocal  = toLocalTime(sunData.results.sunset);
+
+    // Store in hidden fields
+    document.getElementById('fLat').value     = lat;
+    document.getElementById('fLon').value     = lon;
+    document.getElementById('fSunrise').value = sunriseLocal;
+    document.getElementById('fSunset').value  = sunsetLocal;
+
+    // Show preview
+    const srDisp = fmtTimeStr(sunriseLocal);
+    const ssDisp = fmtTimeStr(sunsetLocal);
+    preview.innerHTML = `🌅 Sunrise ${srDisp}<br>🌇 Sunset ${ssDisp}`;
+
+  } catch(err) {
+    console.warn('Sun fetch failed:', err.message);
+    preview.textContent = '⚠️ Could not fetch — will use state average';
+    ['fLat','fLon','fSunrise','fSunset'].forEach(id => document.getElementById(id).value = '');
+  }
+}
+
+// Format stored "HH:MM" string to "7:34 AM" display
+function fmtTimeStr(hhmm) {
+  if (!hhmm) return '—';
+  const [h, m] = hhmm.split(':').map(Number);
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const h12  = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
+}
+
+// Convert stored "HH:MM" to minutes since midnight
+function hmToMins(hhmm) {
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
 /* ─── SUNRISE / SUNSET CALCULATION ─────────────────────────
    Pure-math implementation of the NOAA solar position algorithm.
    Uses each catch's state to look up approximate center lat/lon.
@@ -1060,34 +1164,36 @@ function calcAvgTimes(catches) {
     if (isNaN(d)) return;
     const mins = d.getHours()*60 + d.getMinutes();
 
+    // Use saved API values if available, else fall back to state-center math
+    let riseMins = null, setMins = null;
+    if (c.sunrise && c.sunset) {
+      riseMins = hmToMins(c.sunrise);
+      setMins  = hmToMins(c.sunset);
+    } else if (c.state) {
+      const sun = getSunTimes(d, c.state);
+      if (sun) { riseMins = sun.sunrise; setMins = sun.sunset; }
+    }
+
     if (d.getHours() < 12) {
       amMins.push(mins);
-      // AM — compare to sunrise
-      if (c.state) {
-        const sun = getSunTimes(d, c.state);
-        if (sun) amSunOffsets.push(mins - sun.sunrise);
-      }
+      if (riseMins !== null) amSunOffsets.push(mins - riseMins);
     } else {
       pmMins.push(mins);
-      // PM — compare to sunset
-      if (c.state) {
-        const sun = getSunTimes(d, c.state);
-        if (sun) pmSunOffsets.push(mins - sun.sunset);
-      }
+      if (setMins !== null) pmSunOffsets.push(mins - setMins);
     }
   });
 
   const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
 
   return {
-    amAvg:        avg(amMins),
-    pmAvg:        avg(pmMins),
-    amCount:      amMins.length,
-    pmCount:      pmMins.length,
-    amSunOffset:  avg(amSunOffsets),   // negative = before sunrise, positive = after
-    pmSunOffset:  avg(pmSunOffsets),   // negative = before sunset, positive = after
-    amHasSun:     amSunOffsets.length > 0,
-    pmHasSun:     pmSunOffsets.length > 0,
+    amAvg:       avg(amMins),
+    pmAvg:       avg(pmMins),
+    amCount:     amMins.length,
+    pmCount:     pmMins.length,
+    amSunOffset: avg(amSunOffsets),
+    pmSunOffset: avg(pmSunOffsets),
+    amHasSun:    amSunOffsets.length > 0,
+    pmHasSun:    pmSunOffsets.length > 0,
   };
 }
 
@@ -1216,23 +1322,37 @@ function openDetail(id) {
     ? `<img class="detail-photo" src="${esc(c.photoUrl)}" alt="${esc(c.fish)}" referrerpolicy="no-referrer" />`
     : `<div class="detail-photo-placeholder">${getFishEmoji(c.fish)}</div>`;
 
-  // Calculate sunrise/sunset for this specific catch
+  // Use saved sunrise/sunset if available, else fall back to state-center math
   let sunriseStr = '—', sunsetStr = '—', sunRelStr = '';
-  if (c.date && hasTime(c) && c.state) {
+  if (c.date && hasTime(c)) {
     const d = new Date(c.date);
-    const sun = getSunTimes(d, c.state);
-    if (sun) {
-      sunriseStr = minsToTimeStr(sun.sunrise);
-      sunsetStr  = minsToTimeStr(sun.sunset);
-      const catchMins = d.getHours()*60 + d.getMinutes();
-      if (catchMins < sun.sunrise) {
-        sunRelStr = `🌙 ${minsToRelStr(sun.sunrise - catchMins)} before sunrise`;
-      } else if (catchMins < sun.sunset) {
-        const afterSunrise = catchMins - sun.sunrise;
-        const beforeSunset = sun.sunset - catchMins;
-        sunRelStr = `☀️ ${minsToRelStr(afterSunrise)} after sunrise · ${minsToRelStr(beforeSunset)} before sunset`;
+    const catchMins = d.getHours()*60 + d.getMinutes();
+    let riseMins = null, setMins = null;
+
+    if (c.sunrise && c.sunset) {
+      // Saved exact values from API
+      riseMins   = hmToMins(c.sunrise);
+      setMins    = hmToMins(c.sunset);
+      sunriseStr = fmtTimeStr(c.sunrise);
+      sunsetStr  = fmtTimeStr(c.sunset);
+    } else if (c.state) {
+      // Fall back to pure-math state-center estimate
+      const sun = getSunTimes(d, c.state);
+      if (sun) {
+        riseMins   = Math.round(sun.sunrise);
+        setMins    = Math.round(sun.sunset);
+        sunriseStr = minsToTimeStr(riseMins);
+        sunsetStr  = minsToTimeStr(setMins);
+      }
+    }
+
+    if (riseMins !== null && setMins !== null) {
+      if (catchMins < riseMins) {
+        sunRelStr = `🌙 ${minsToRelStr(riseMins - catchMins)} before sunrise`;
+      } else if (catchMins < setMins) {
+        sunRelStr = `☀️ ${minsToRelStr(catchMins - riseMins)} after sunrise · ${minsToRelStr(setMins - catchMins)} before sunset`;
       } else {
-        sunRelStr = `🌙 ${minsToRelStr(catchMins - sun.sunset)} after sunset`;
+        sunRelStr = `🌙 ${minsToRelStr(catchMins - setMins)} after sunset`;
       }
     }
   }
@@ -1285,7 +1405,19 @@ function openEditCatch(id) {
   document.getElementById('fLureCustom').value         = '';
   document.getElementById('fWith').value               = c.fishWith || '';
   document.getElementById('fLocation').value           = c.location || '';
+  document.getElementById('fCity').value               = c.city     || '';
   document.getElementById('fTrip').value               = c.trip     || '';
+  // Restore saved sun data
+  document.getElementById('fLat').value     = c.lat     || '';
+  document.getElementById('fLon').value     = c.lon     || '';
+  document.getElementById('fSunrise').value = c.sunrise || '';
+  document.getElementById('fSunset').value  = c.sunset  || '';
+  const sp = document.getElementById('sunPreview');
+  if (c.sunrise && c.sunset) {
+    sp.innerHTML = `🌅 Sunrise ${fmtTimeStr(c.sunrise)}<br>🌇 Sunset ${fmtTimeStr(c.sunset)}`;
+  } else {
+    sp.textContent = c.city ? '' : '';
+  }
   document.getElementById('fNotes').value              = c.notes    || '';
   document.getElementById('fState').value              = c.state    || '';
   // Detect if this catch was saved without a time (date-only string has no 'T')
@@ -1426,12 +1558,13 @@ function copyShareUrl() {
    FORM HELPERS
 ═══════════════════════════════════════════════════════════ */
 function resetForm() {
-  ['fFish','fWeight','fLureCustom','fWith','fLocation','fTrip','fNotes'].forEach(id=>document.getElementById(id).value='');
+  ['fFish','fWeight','fLureCustom','fWith','fLocation','fCity','fTrip','fNotes'].forEach(id=>document.getElementById(id).value='');
+  ['fLat','fLon','fSunrise','fSunset'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('sunPreview').textContent = '';
   document.getElementById('fPhoto').value='';
   document.getElementById('fPhotoPreview').classList.remove('show');
   document.getElementById('fCropControl').classList.remove('show');
   document.getElementById('fCropPos').value = 'center center';
-  // Reset date/time toggle back to full datetime mode
   document.getElementById('fNoTime').checked = false;
   document.getElementById('fDate').style.display = '';
   document.getElementById('fDateOnly').style.display = 'none';
