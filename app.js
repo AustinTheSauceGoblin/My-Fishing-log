@@ -1008,17 +1008,36 @@ async function fetchSunForCity() {
       "Virginia":"America/New_York","Washington":"America/Los_Angeles","West Virginia":"America/New_York",
       "Wisconsin":"America/Chicago","Wyoming":"America/Denver"
     };
-    const catchDate = date ? date.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    // The API returns UTC times even with tzid in some cases.
+    // We'll convert UTC → local ourselves using a UTC offset for the state.
+    // We use the JS Intl API to get the actual UTC offset for the state's timezone
+    // on the specific catch date (handles DST automatically).
     const tzid      = STATE_TZ[document.getElementById('fState').value] || 'America/New_York';
-    const sunResp   = await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${catchDate}&tzid=${encodeURIComponent(tzid)}&formatted=0`);
+    const catchDate = date ? date.slice(0, 10) : new Date().toISOString().slice(0, 10);
+    const sunResp   = await fetch(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${catchDate}&formatted=0`);
     const sunData   = await sunResp.json();
     if (sunData.status !== 'OK') throw new Error('Sunrise API error');
 
-    // API now returns times in the location's local timezone — just extract HH:MM
+    // Get UTC offset in minutes for the catch location's timezone on the catch date
+    // Intl.DateTimeFormat with timeZone handles DST correctly
+    const getUtcOffsetMins = (tzId, dateStr) => {
+      const d = new Date(dateStr + 'T12:00:00Z');
+      const utcStr   = d.toLocaleString('en-US', { timeZone: 'UTC' });
+      const localStr = d.toLocaleString('en-US', { timeZone: tzId });
+      const utcDate  = new Date(utcStr);
+      const locDate  = new Date(localStr);
+      return (locDate - utcDate) / 60000; // minutes
+    };
+
+    const offsetMins = getUtcOffsetMins(tzid, catchDate);
+
+    // Convert UTC ISO string to local HH:MM
     const toLocalTime = (isoStr) => {
-      // isoStr is like "2026-05-05T20:14:00-06:00" — local time is in the string itself
-      const timePart = isoStr.split('T')[1];
-      const [h, m]   = timePart.split(':').map(Number);
+      const utcDate = new Date(isoStr);
+      const localMs = utcDate.getTime() + offsetMins * 60000;
+      const localDate = new Date(localMs);
+      const h = localDate.getUTCHours();
+      const m = localDate.getUTCMinutes();
       return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
     };
 
@@ -1345,6 +1364,7 @@ function openDetail(id) {
 
   // Use saved sunrise/sunset if available, else fall back to state-center math
   let sunriseStr = '—', sunsetStr = '—', sunRelStr = '';
+  let sunIsExact = false;
   if (c.date && hasTime(c)) {
     const d = new Date(c.date);
     const catchMins = d.getHours()*60 + d.getMinutes();
@@ -1356,14 +1376,15 @@ function openDetail(id) {
       setMins    = hmToMins(c.sunset);
       sunriseStr = fmtTimeStr(c.sunrise);
       sunsetStr  = fmtTimeStr(c.sunset);
+      sunIsExact = true;
     } else if (c.state) {
       // Fall back to pure-math state-center estimate
       const sun = getSunTimes(d, c.state);
       if (sun) {
         riseMins   = Math.round(sun.sunrise);
         setMins    = Math.round(sun.sunset);
-        sunriseStr = minsToTimeStr(riseMins);
-        sunsetStr  = minsToTimeStr(setMins);
+        sunriseStr = minsToTimeStr(riseMins) + ' (est.)';
+        sunsetStr  = minsToTimeStr(setMins)  + ' (est.)';
       }
     }
 
@@ -1382,9 +1403,10 @@ function openDetail(id) {
     {label:'Weight',      value: c.weight?parseFloat(c.weight).toFixed(2)+' lbs':'—'},
     {label:'Date & Time', value: dt},
     {label:'State',       value: c.state?`${STATE_EMOJI[c.state]||'📍'} ${c.state}`:'—'},
+    {label:'City',        value: c.city||'—'},
     {label:'Location',    value: c.location||'—'},
-    {label:'Sunrise',     value: sunriseStr},
-    {label:'Sunset',      value: sunsetStr},
+    {label: sunIsExact ? 'Sunrise (exact)' : 'Sunrise (est.)', value: sunriseStr},
+    {label: sunIsExact ? 'Sunset (exact)'  : 'Sunset (est.)',  value: sunsetStr},
     {label:'Lure / Bait', value: c.lure||'—'},
     {label:'Rod',         value: c.rod||'—'},
     {label:'Fished With', value: c.fishWith||'—'},
