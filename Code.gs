@@ -13,7 +13,7 @@
 //  New catches will fill them automatically.
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_ID    = "10rqVPyLthOjmbVY0z9k8bPjidEKc7LK0nhCLo2pVY-s";
+const SHEET_ID    = "YOUR_SHEET_ID_HERE";
 const SHEET_TAB   = "Catches";
 const APPDATA_TAB = "AppData";
 const SHOPS_TAB   = "FishShops";
@@ -113,8 +113,8 @@ function addCatch(data) {
   row[COL.CITY]=data.city||'';
   row[COL.LAT]=data.lat!==undefined&&data.lat!=='' ? data.lat : '';
   row[COL.LON]=data.lon!==undefined&&data.lon!=='' ? data.lon : '';
-  row[COL.SUNRISE]=data.sunrise||'';
-  row[COL.SUNSET]=data.sunset||'';
+  row[COL.SUNRISE]=data.sunrise ? String(data.sunrise) : '';
+  row[COL.SUNSET]=data.sunset   ? String(data.sunset)  : '';
   sheet.appendRow(row);
   return { success:true, id };
 }
@@ -143,8 +143,8 @@ function editCatch(data) {
     newRow[COL.CITY]=data.city!==undefined?(data.city||''):(values[i][COL.CITY]||'');
     newRow[COL.LAT]=data.lat!==undefined&&data.lat!=='' ? data.lat : (values[i][COL.LAT]||'');
     newRow[COL.LON]=data.lon!==undefined&&data.lon!=='' ? data.lon : (values[i][COL.LON]||'');
-    newRow[COL.SUNRISE]=data.sunrise!==undefined?(data.sunrise||''):(values[i][COL.SUNRISE]||'');
-    newRow[COL.SUNSET]=data.sunset!==undefined?(data.sunset||''):(values[i][COL.SUNSET]||'');
+    newRow[COL.SUNRISE]=data.sunrise!==undefined ? (data.sunrise ? String(data.sunrise) : '') : String(values[i][COL.SUNRISE]||'');
+    newRow[COL.SUNSET]=data.sunset!==undefined   ? (data.sunset  ? String(data.sunset)  : '') : String(values[i][COL.SUNSET]||'');
     sheet.getRange(rowNum,1,1,COLS.length).setValues([newRow]);
     return { success:true };
   }
@@ -290,6 +290,10 @@ function getSheet() {
     hdr.setFontWeight('bold'); hdr.setBackground('#2c6e8a'); hdr.setFontColor('#ffffff');
     sheet.setFrozenRows(1);
   }
+  // Force Sunrise (col 16) and Sunset (col 17) to plain text so Sheets
+  // doesn't auto-convert "2115" or "HH:MM" into time serial numbers
+  sheet.getRange(2, COL.SUNRISE + 1, Math.max(sheet.getLastRow(), 2), 1).setNumberFormat('@STRING@');
+  sheet.getRange(2, COL.SUNSET  + 1, Math.max(sheet.getLastRow(), 2), 1).setNumberFormat('@STRING@');
   return sheet;
 }
 

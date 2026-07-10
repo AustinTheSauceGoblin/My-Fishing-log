@@ -1044,13 +1044,17 @@ async function fetchSunForCity() {
     const sunriseLocal = toLocalTime(sunData.results.sunrise);
     const sunsetLocal  = toLocalTime(sunData.results.sunset);
 
-    // Store in hidden fields
+    // Store as "HHMM" without colon — Google Sheets auto-converts "HH:MM"
+    // into a time serial number, corrupting the value on read-back.
+    // "2115" is just a number string Sheets won't touch.
+    const toStorable = (hhmm) => hhmm ? hhmm.replace(':', '') : '';
+
     document.getElementById('fLat').value     = lat;
     document.getElementById('fLon').value     = lon;
-    document.getElementById('fSunrise').value = sunriseLocal;
-    document.getElementById('fSunset').value  = sunsetLocal;
+    document.getElementById('fSunrise').value = toStorable(sunriseLocal);
+    document.getElementById('fSunset').value  = toStorable(sunsetLocal);
 
-    // Show preview
+    // Show preview using formatted display (still HH:MM for display)
     const srDisp = fmtTimeStr(sunriseLocal);
     const ssDisp = fmtTimeStr(sunsetLocal);
     preview.innerHTML = `🌅 Sunrise ${srDisp}<br>🌇 Sunset ${ssDisp}`;
@@ -1062,19 +1066,45 @@ async function fetchSunForCity() {
   }
 }
 
-// Format stored "HH:MM" string to "7:34 AM" display
+// Format stored "HHMM" or "HH:MM" string to "7:34 AM" display
 function fmtTimeStr(hhmm) {
   if (!hhmm) return '—';
-  const [h, m] = hhmm.split(':').map(Number);
+  const s = String(hhmm).trim();
+  let h, m;
+  if (s.includes(':')) {
+    [h, m] = s.split(':').map(Number);
+  } else if (s.length === 4) {
+    h = parseInt(s.slice(0, 2));
+    m = parseInt(s.slice(2, 4));
+  } else if (s.length === 3) {
+    h = parseInt(s.slice(0, 1));
+    m = parseInt(s.slice(1, 3));
+  } else {
+    return '—';
+  }
+  if (isNaN(h) || isNaN(m)) return '—';
   const ampm = h < 12 ? 'AM' : 'PM';
   const h12  = h % 12 || 12;
   return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
 }
 
-// Convert stored "HH:MM" to minutes since midnight
+// Convert stored "HHMM" or "HH:MM" to minutes since midnight
 function hmToMins(hhmm) {
   if (!hhmm) return null;
-  const [h, m] = hhmm.split(':').map(Number);
+  const s = String(hhmm).trim();
+  let h, m;
+  if (s.includes(':')) {
+    [h, m] = s.split(':').map(Number);
+  } else if (s.length === 4) {
+    h = parseInt(s.slice(0, 2));
+    m = parseInt(s.slice(2, 4));
+  } else if (s.length === 3) {
+    h = parseInt(s.slice(0, 1));
+    m = parseInt(s.slice(1, 3));
+  } else {
+    return null;
+  }
+  if (isNaN(h) || isNaN(m)) return null;
   return h * 60 + m;
 }
 
@@ -1459,7 +1489,7 @@ function openEditCatch(id) {
   if (c.sunrise && c.sunset) {
     sp.innerHTML = `🌅 Sunrise ${fmtTimeStr(c.sunrise)}<br>🌇 Sunset ${fmtTimeStr(c.sunset)}`;
   } else {
-    sp.textContent = c.city ? '' : '';
+    sp.textContent = '';
   }
   document.getElementById('fNotes').value              = c.notes    || '';
   document.getElementById('fState').value              = c.state    || '';
