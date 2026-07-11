@@ -262,6 +262,23 @@
     .shop-detail-photo { width: 100%; height: auto; max-height: 70vh; object-fit: contain; display: block; background: #111; }
     .shop-detail-placeholder { width: 100%; height: 200px; background: linear-gradient(135deg,#fff3e0,#ffe0b2); display: flex; align-items: center; justify-content: center; font-size: 4rem; }
 
+    /* ── HOW TO USE PAGE ── */
+    .howto-section { background: #fff; border-radius: var(--r); border: 1px solid var(--line); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+    .howto-section-header { display: flex; align-items: center; gap: 12px; padding: 16px 18px; cursor: pointer; user-select: none; }
+    .howto-section-header:hover { background: var(--parchment); }
+    .howto-section-icon { font-size: 1.5rem; flex-shrink: 0; }
+    .howto-section-title { font-family: 'Playfair Display', serif; font-size: 1.05rem; font-weight: 700; color: var(--water-dk); flex: 1; }
+    .howto-chevron { color: #bbb; font-size: .9rem; transition: transform .2s; flex-shrink: 0; }
+    .howto-section.open .howto-chevron { transform: rotate(90deg); }
+    .howto-body { display: none; padding: 0 18px 18px; border-top: 1px solid var(--line); }
+    .howto-section.open .howto-body { display: block; }
+    .howto-body p { font-size: .9rem; line-height: 1.65; color: #444; margin-top: 12px; }
+    .howto-body p + p { margin-top: 8px; }
+    .howto-body ul { margin: 10px 0 0 18px; }
+    .howto-body ul li { font-size: .88rem; line-height: 1.6; color: #444; margin-bottom: 4px; }
+    .howto-tip { background: #f0f8ff; border-left: 3px solid var(--water); border-radius: 0 6px 6px 0; padding: 8px 12px; margin-top: 12px; font-size: .84rem; color: var(--water-dk); line-height: 1.5; }
+    .howto-intro { font-family: 'DM Mono', monospace; font-size: .78rem; color: var(--water); background: var(--parchment); border-radius: 8px; padding: 12px 14px; margin-bottom: 20px; line-height: 1.6; border: 1px solid var(--line); }
+
     /* ── SETTINGS PAGE ── */
     .settings-section-title { font-family: 'DM Mono', monospace; font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: var(--water); border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 14px; margin-top: 8px; }
 
@@ -307,6 +324,7 @@
         <button class="btn btn-ghost" onclick="navTo('page-rods')">🎣 Rod Rack</button>
         <button class="btn btn-ghost" onclick="navTo('page-shops')">🏪 Fish Shops</button>
         <button class="btn btn-ghost" onclick="navTo('page-settings')">⚙️ Settings</button>
+        <button class="btn btn-ghost" onclick="navTo('page-howto')">📖 How To Use</button>
       </div>
     </div>
 
@@ -815,6 +833,283 @@
     </div>
   </div>
 
+
+  <!-- ════════════════════ HOW TO USE PAGE ════════════════════ -->
+  <div class="page" id="page-howto">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="navBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Home
+      </button>
+      <span class="nav-title">📖 How To Use</span>
+    </div>
+    <div class="page-content" style="max-width:700px">
+
+      <div class="howto-intro">
+        Welcome to The Fishing Log — your personal fishing diary. Tap any section below to learn how it works.
+      </div>
+
+      <!-- LOGGING A CATCH -->
+      <div class="howto-section open" id="howto-log">
+        <div class="howto-section-header" onclick="toggleHowto('howto-log')">
+          <div class="howto-section-icon">🎣</div>
+          <div class="howto-section-title">Logging a Catch</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>Tap the <strong>+ Log a Catch</strong> button at the top of the home screen to record a new catch.</p>
+          <p>Fill in the details about your catch — the required fields are Fish Type and Date. Everything else is optional but helps build your stats over time.</p>
+          <ul>
+            <li><strong>Fish Type</strong> — Start typing and common species will appear as suggestions.</li>
+            <li><strong>Weight</strong> — Enter in pounds. Decimal values are fine (e.g. 3.75).</li>
+            <li><strong>Date &amp; Time</strong> — Defaults to right now. Check "Date only" if you don't know the exact time.</li>
+            <li><strong>Lure / Bait</strong> — Choose from your Tackle Box or type a custom lure below the dropdown.</li>
+            <li><strong>Rod Used</strong> — Choose from your Rod Rack. Set a default rod in the Rod Rack to skip this every time.</li>
+            <li><strong>Fished With</strong> — Enter who you were fishing with. Separate multiple people with commas (e.g. Dad, Jake). These build your Fishing Buddies list.</li>
+            <li><strong>Location</strong> — The specific spot (e.g. "North bank dock"). Previous locations appear as suggestions.</li>
+            <li><strong>City</strong> — The nearest city. This is used to look up the exact sunrise and sunset time for your catch.</li>
+            <li><strong>State</strong> — Your default state (set in Settings) fills in automatically.</li>
+            <li><strong>Trip Tag</strong> — Label this catch as part of a trip (e.g. "Yellowstone 2026"). Use the same tag for every catch on a trip to filter them together.</li>
+            <li><strong>Photo</strong> — Tap to upload a photo. After picking one, use the crop position grid to choose which part of the image shows on the card preview.</li>
+          </ul>
+          <div class="howto-tip">💡 Tap a catch card on the home screen to view full details, edit any field, or delete it.</div>
+        </div>
+      </div>
+
+      <!-- TACKLE BOX -->
+      <div class="howto-section" id="howto-tackle">
+        <div class="howto-section-header" onclick="toggleHowto('howto-tackle')">
+          <div class="howto-section-icon">🧰</div>
+          <div class="howto-section-title">Tackle Box</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>The Tackle Box stores all your lures so you can quickly select one when logging a catch instead of typing it every time.</p>
+          <p>Each lure has four fields: <strong>Lure Name</strong>, <strong>Color</strong>, <strong>Brand</strong>, and <strong>Details</strong>. In the catch form dropdown and on the main screen it shows as "Name (Color)" for quick identification.</p>
+          <ul>
+            <li>Tap any lure in the list to see all its details.</li>
+            <li>From the detail view you can <strong>Edit</strong> any field or <strong>Delete</strong> the lure.</li>
+            <li>Each lure shows a catch count badge so you can see which lures are producing.</li>
+          </ul>
+          <div class="howto-tip">💡 If you used a lure not in your Tackle Box, use the "Custom Lure" field on the catch form — it overrides the dropdown for that catch without adding to your box.</div>
+        </div>
+      </div>
+
+      <!-- ROD RACK -->
+      <div class="howto-section" id="howto-rods">
+        <div class="howto-section-header" onclick="toggleHowto('howto-rods')">
+          <div class="howto-section-icon">🎣</div>
+          <div class="howto-section-title">Rod Rack</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>The Rod Rack stores all your rod and reel setups so you can track which rod you used for each catch.</p>
+          <p>Each rod has three fields: <strong>Nickname</strong> (shown in lists and dropdowns), <strong>Rod</strong> (the rod itself), and <strong>Reel</strong>.</p>
+          <ul>
+            <li>Set one rod as your <strong>Default</strong> and it will pre-fill automatically every time you log a catch.</li>
+            <li>Tap any rod to see full details, edit it, set it as default, or delete it.</li>
+            <li>Each rod shows a catch count so you can see which setup you use most.</li>
+          </ul>
+          <div class="howto-tip">💡 The first rod you add automatically becomes the default. You can change it anytime from the rod's detail view.</div>
+        </div>
+      </div>
+
+      <!-- FISH SHOPS -->
+      <div class="howto-section" id="howto-shops">
+        <div class="howto-section-header" onclick="toggleHowto('howto-shops')">
+          <div class="howto-section-icon">🏪</div>
+          <div class="howto-section-title">Fish Shops</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>Fish Shops is your personal directory of bait shops, tackle stores, and fishing outfitters you've visited or want to visit.</p>
+          <p>Each shop stores its <strong>Name</strong>, <strong>City</strong>, <strong>State</strong>, <strong>Address</strong>, <strong>Shop Type</strong>, <strong>Notes</strong>, and a <strong>Photo</strong>.</p>
+          <ul>
+            <li><strong>Shop Type</strong> options are: Fly Fishing, Ocean Fishing, Bass Fishing, and All.</li>
+            <li>Filter shops by State or Shop Type using the dropdowns at the top of the page.</li>
+            <li>Tap any shop card to see full details, edit, or delete it.</li>
+            <li>Shop data is saved to your Google Sheet so it syncs across all your devices.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- FAVORITES -->
+      <div class="howto-section" id="howto-favs">
+        <div class="howto-section-header" onclick="toggleHowto('howto-favs')">
+          <div class="howto-section-icon">❤️</div>
+          <div class="howto-section-title">Favorites</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>Favorite any catch by tapping the <strong>heart icon</strong> on the top-right of the catch card photo. Favorited catches appear in the Favorites section above your catch log on the home screen.</p>
+          <ul>
+            <li>The number of favorites shown on the home screen matches your <strong>Catch Log Preview</strong> setting (set in Settings).</li>
+            <li>If you have more favorites than the limit, <strong>View All Favorites</strong> and <strong>Edit Shown</strong> buttons appear below the section.</li>
+            <li><strong>Edit Shown</strong> lets you hand-pick exactly which favorites display on the home screen, up to your limit. Tap catches to select or deselect them, then tap Save.</li>
+            <li>Your favorites and pinned selections sync across devices.</li>
+          </ul>
+          <div class="howto-tip">💡 You can also favorite/unfavorite a catch from its detail page using the Favorite button.</div>
+        </div>
+      </div>
+
+      <!-- FISHING BUDDIES -->
+      <div class="howto-section" id="howto-buddies">
+        <div class="howto-section-header" onclick="toggleHowto('howto-buddies')">
+          <div class="howto-section-icon">🧑‍🤝‍🧑</div>
+          <div class="howto-section-title">Fishing Buddies</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>Fishing Buddies automatically builds a list of everyone you've fished with, based on the <strong>Fished With</strong> field when logging catches.</p>
+          <ul>
+            <li>Tap the <strong>Buddies</strong> stat card on the home screen to see your full buddy list.</li>
+            <li>Each buddy shows their name, the date you first fished together, and total catch count — sorted from most to least catches.</li>
+            <li>Tap any buddy to see all the catches you've logged while fishing with them.</li>
+            <li>When logging a catch, the Fished With field suggests names from your history as you type.</li>
+          </ul>
+          <div class="howto-tip">💡 You can enter multiple people separated by commas: "Dad, Jake". Each person is tracked individually.</div>
+        </div>
+      </div>
+
+      <!-- FISHING SPOTS -->
+      <div class="howto-section" id="howto-spots">
+        <div class="howto-section-header" onclick="toggleHowto('howto-spots')">
+          <div class="howto-section-icon">📍</div>
+          <div class="howto-section-title">Fishing Spots</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>Fishing Spots automatically tracks every unique location you've entered when logging catches. No setup needed — just fill in the Location field and your spots build themselves.</p>
+          <ul>
+            <li>Tap the <strong>Spots</strong> stat card on the home screen to see all your spots.</li>
+            <li>Each spot shows how many catches you've logged there and the first date you fished it, sorted by catch count.</li>
+            <li>Tap any spot to see all the catches from that location.</li>
+            <li>The Location field auto-suggests previous spots as you type.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- TRIPS -->
+      <div class="howto-section" id="howto-trips">
+        <div class="howto-section-header" onclick="toggleHowto('howto-trips')">
+          <div class="howto-section-icon">🏕️</div>
+          <div class="howto-section-title">Trips</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>Trips let you group catches together under a shared label so you can filter and review them as a set.</p>
+          <p>When logging a catch, enter a trip name in the <strong>Trip Tag</strong> field (e.g. "Yellowstone 2026" or "Family Summer"). Use the exact same tag for every catch on that trip.</p>
+          <ul>
+            <li>Filter your entire home screen by trip using the <strong>All Trips</strong> dropdown in the filter bar — species stats, state breakdown, and catch log all update to show only that trip's catches.</li>
+            <li>The Trip Tag field suggests your existing trips as you type.</li>
+            <li>Active trip count is shown in the stats strip at the top of the home screen.</li>
+          </ul>
+          <div class="howto-tip">💡 Trip tags are freeform text — you can use any naming convention that works for you.</div>
+        </div>
+      </div>
+
+      <!-- STATS & FILTERS -->
+      <div class="howto-section" id="howto-stats">
+        <div class="howto-section-header" onclick="toggleHowto('howto-stats')">
+          <div class="howto-section-icon">📊</div>
+          <div class="howto-section-title">Stats &amp; Filters</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>The stats strip at the top of the home screen shows your totals at a glance — total catches, unique species, biggest fish, states fished, active trips, fishing buddies, and fishing spots.</p>
+          <p>The <strong>By Species</strong> section breaks down each fish type with catch count, best weight, and average catch times. For species with a city entered, it shows the exact average time relative to sunrise and sunset.</p>
+          <p>The <strong>By State</strong> section shows every state you've fished in with catch counts. Tap any state card to see all catches from that state.</p>
+          <p>Use the filter bar to narrow down everything on the page at once:</p>
+          <ul>
+            <li><strong>All Trips</strong> — filter by trip tag</li>
+            <li><strong>All Species</strong> — filter by fish type</li>
+            <li><strong>All States</strong> — filter by state</li>
+            <li><strong>All Cities</strong> — filter by city</li>
+            <li><strong>All Lures</strong> — filter by lure used</li>
+            <li><strong>All Months</strong> — filter by month across all years</li>
+            <li><strong>Search</strong> — searches across all fields</li>
+          </ul>
+          <div class="howto-tip">💡 Tap the ✕ Clear button to reset all filters at once.</div>
+        </div>
+      </div>
+
+      <!-- SUNRISE / SUNSET -->
+      <div class="howto-section" id="howto-sun">
+        <div class="howto-section-header" onclick="toggleHowto('howto-sun')">
+          <div class="howto-section-icon">🌅</div>
+          <div class="howto-section-title">Sunrise &amp; Sunset Tracking</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>When you enter a <strong>City</strong> and <strong>State</strong> on a catch, the app automatically looks up the exact sunrise and sunset times for that location on the date of the catch.</p>
+          <ul>
+            <li>The sunrise and sunset times appear on the catch detail page.</li>
+            <li>A summary line shows where your catch fell — e.g. "☀️ 1h 23m after sunrise · 3h 45m before sunset" or "🌙 47m after sunset".</li>
+            <li>The By Species section shows average catch times relative to sunrise (AM catches) and sunset (PM catches).</li>
+            <li>For old catches without a city, the app uses the state's center coordinates as an estimate, shown as "(est.)".</li>
+          </ul>
+          <div class="howto-tip">💡 To backfill old catches with exact times, open the catch → Edit → enter the city → tap outside the field to trigger the lookup → Save.</div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="howto-section" id="howto-settings">
+        <div class="howto-section-header" onclick="toggleHowto('howto-settings')">
+          <div class="howto-section-icon">⚙️</div>
+          <div class="howto-section-title">Settings</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <ul>
+            <li><strong>Default State</strong> — pre-fills the State field every time you log a catch so you don't have to select it manually.</li>
+            <li><strong>Display Name</strong> — the name shown at the top of the home screen.</li>
+            <li><strong>Catch Log Preview</strong> — how many recent catches to show on the home screen (4, 8, 12, 16, or 20). The same limit applies to favorites. Tap "View All" to see everything.</li>
+            <li><strong>Sync Now</strong> — manually forces a sync of your tackle box, rods, favorites, and settings to Google Sheets so they're available on other devices.</li>
+          </ul>
+          <div class="howto-tip">💡 Tackle box, rods, favorites, and settings sync automatically in the background a couple of seconds after any change. The "✅ Synced" indicator in the header confirms it worked.</div>
+        </div>
+      </div>
+
+      <!-- CROSS-DEVICE SYNC -->
+      <div class="howto-section" id="howto-sync">
+        <div class="howto-section-header" onclick="toggleHowto('howto-sync')">
+          <div class="howto-section-icon">🔄</div>
+          <div class="howto-section-title">Cross-Device Sync</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>Your catch data is stored in Google Sheets and available on any device that opens this app with the same Web App URL in config.js.</p>
+          <p>Your tackle box, rod rack, favorites, pinned favorites, photo crop positions, and settings sync automatically to Sheets in the background whenever you make a change. When you open the app on another device, it pulls the latest version down first.</p>
+          <ul>
+            <li>A small <strong>🔄 Syncing…</strong> indicator appears under the header when a sync is in progress.</li>
+            <li><strong>✅ Synced</strong> confirms the sync completed successfully.</li>
+            <li><strong>⚠️ Sync error</strong> means the app couldn't reach the server — it will retry automatically on the next change.</li>
+            <li>Use <strong>Sync Now</strong> in Settings to force an immediate sync before switching devices.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- SHARING -->
+      <div class="howto-section" id="howto-share">
+        <div class="howto-section-header" onclick="toggleHowto('howto-share')">
+          <div class="howto-section-icon">🔗</div>
+          <div class="howto-section-title">Sharing with Friends</div>
+          <div class="howto-chevron">›</div>
+        </div>
+        <div class="howto-body">
+          <p>Each person gets their own completely separate fishing log — their own Google Sheet, their own data, their own tackle box and settings. Nothing is shared between logs.</p>
+          <p>To set up a log for a friend, they need to:</p>
+          <ul>
+            <li>Create their own Google Sheet and follow the setup steps in SETUP.md</li>
+            <li>Deploy their own Google Apps Script and get their own Web App URL</li>
+            <li>Enter that URL in their copy of config.js</li>
+          </ul>
+          <p>The app files themselves (index.html, app.js, config.js) are identical for everyone — only the Web App URL in config.js is different per person.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
 
   <!-- ════════════════════ SETTINGS PAGE ════════════════════ -->
   <div class="page" id="page-settings">
