@@ -869,6 +869,11 @@ function populateFilters() {
   lureSel.innerHTML = '<option value="">All Lures</option>';
   lures.forEach(l => lureSel.insertAdjacentHTML('beforeend', `<option value="${esc(l)}">${esc(l)}</option>`));
 
+  const cities = [...new Set(allCatches.map(c=>c.city).filter(Boolean).map(c=>c.trim()))].sort();
+  const citySel = document.getElementById('filterCity');
+  citySel.innerHTML = '<option value="">All Cities</option>';
+  cities.forEach(c => citySel.insertAdjacentHTML('beforeend', `<option value="${esc(c)}">${esc(c)}</option>`));
+
   // Autocomplete datalists
   const buddyDL = document.getElementById('buddySuggestions');
   if (buddyDL) { buddyDL.innerHTML = getBuddyStats().map(b=>`<option value="${esc(b.name)}">`).join(''); }
@@ -882,6 +887,7 @@ function applyFilters() {
   const tripVal  = document.getElementById('filterTrip').value;
   const fishVal  = document.getElementById('filterFish').value;
   const stateVal = document.getElementById('filterState').value;
+  const cityVal  = document.getElementById('filterCity').value;
   const lureVal  = document.getElementById('filterLure').value;
   const monthVal = document.getElementById('filterMonth').value;
   const search   = document.getElementById('searchInput').value.toLowerCase();
@@ -890,6 +896,7 @@ function applyFilters() {
     if (tripVal  && c.trip  !== tripVal)  return false;
     if (fishVal  && c.fish  !== fishVal)  return false;
     if (stateVal && c.state !== stateVal) return false;
+    if (cityVal  && (c.city||'').trim() !== cityVal) return false;
     if (lureVal  && c.lure  !== lureVal)  return false;
     if (monthVal !== '' && monthVal !== undefined) {
       if (!c.date) return false;
@@ -907,7 +914,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  ['filterTrip','filterFish','filterState','filterLure','filterMonth','searchInput'].forEach(id => document.getElementById(id).value='');
+  ['filterTrip','filterFish','filterState','filterCity','filterLure','filterMonth','searchInput'].forEach(id => document.getElementById(id).value='');
   applyFilters();
 }
 
