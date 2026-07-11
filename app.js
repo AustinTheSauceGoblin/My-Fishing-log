@@ -1617,6 +1617,12 @@ function openSpotCatches(location) {
 /* ═══════════════════════════════════════════════════════════
    SETTINGS
 ═══════════════════════════════════════════════════════════ */
+function toggleHowto(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle('open');
+}
+
 function saveSettings() {
   const settings={
     defaultState: document.getElementById('settingsDefaultState').value,
