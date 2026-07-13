@@ -111,7 +111,7 @@ let _syncTimer   = null;
 
 function queueSyncPush(localKey, value) {
   if (!CONFIG.WEB_APP_URL) return;
-  const sheetKey = { [pfx()+'tackle']:'tackle', [pfx()+'rods']:'rods', [pfx()+'favs']:'favorites', [pfx()+'pinnedfavs']:'pinnedfavs', [pfx()+'settings']:'settings', [pfx()+'crops']:'crops' }[localKey];
+  const sheetKey = { [pfx()+'tackle']:'tackle', [pfx()+'rods']:'rods', [pfx()+'favs']:'favorites', [pfx()+'pinnedfavs']:'pinnedfavs', [pfx()+'settings']:'settings', [pfx()+'crops']:'crops', [pfx()+'lostlures']:'lostlures' }[localKey];
   if (!sheetKey) return;
   _syncPending[sheetKey] = value;
   clearTimeout(_syncTimer);
@@ -149,12 +149,13 @@ async function pullAndMergeAppData() {
 
     // Map sheet keys back to local namespaced keys
     const sheetToLocal = {
-      tackle:    pfx()+'tackle',
-      rods:      pfx()+'rods',
-      favorites:   pfx()+'favs',
-      pinnedfavs:  pfx()+'pinnedfavs',
-      settings:  pfx()+'settings',
-      crops:     pfx()+'crops',
+      tackle:     pfx()+'tackle',
+      rods:       pfx()+'rods',
+      favorites:  pfx()+'favs',
+      pinnedfavs: pfx()+'pinnedfavs',
+      settings:   pfx()+'settings',
+      crops:      pfx()+'crops',
+      lostlures:  pfx()+'lostlures',
     };
 
     Object.entries(sheetToLocal).forEach(([sheetKey, localKey]) => {
@@ -211,7 +212,8 @@ async function manualSync() {
 /* ═══════════════════════════════════════════════════════════
    PAGE NAVIGATION
 ═══════════════════════════════════════════════════════════ */
-let _skipLogReset = false;
+let _skipLogReset      = false;
+let _skipLostLureReset = false;
 
 function navTo(pageId) {
   const current = _pageStack[_pageStack.length - 1];
@@ -223,8 +225,11 @@ function navTo(pageId) {
   if (pageId === 'page-all-catches') prepAllCatches();
   if (pageId === 'page-all-favs')    prepAllFavs();
   if (pageId === 'page-pin-favs')    prepPinFavs();
-  if (pageId === 'page-tackle')      renderTackleList();
-  if (pageId === 'page-rods')        renderRodList();
+  if (pageId === 'page-tackle')           renderTackleList();
+  if (pageId === 'page-rods')             renderRodList();
+  if (pageId === 'page-lost-lures')       renderLostLures();
+  if (pageId === 'page-lost-lure-add' && !_skipLostLureReset) resetLostLureForm();
+  _skipLostLureReset = false;
   if (pageId === 'page-shops')       { renderShops(); populateShopStateFilter(); }
   if (pageId === 'page-shop-add' && !_skipShopReset) resetShopForm();
   _skipShopReset = false;
@@ -540,6 +545,160 @@ function savePinnedFavs() {
   showToast('Pinned favorites saved!', 'success');
   navBack();
   renderFavs();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   LOST LURES
+═══════════════════════════════════════════════════════════ */
+
+function getLostLures()     { return ls.get(pfx()+'lostlures', []); }
+function saveLostLuresLS(a) { setSynced(pfx()+'lostlures', a); }
+
+function renderLostLures() {
+  const lures   = getLostLures();
+  const list    = document.getElementById('lostLureList');
+  const empty   = document.getElementById('lostLureEmpty');
+  const statBar = document.getElementById('lostStatBar');
+  if (!list) return;
+
+  if (statBar) {
+    const total     = lures.length;
+    const totalCost = lures.reduce((sum,l) => sum + (parseFloat(l.price)||0), 0);
+    if (total) {
+      statBar.style.display = 'flex';
+      statBar.innerHTML = `
+        <div class="lost-stat"><div class="lost-stat-val">${total}</div><div class="lost-stat-lbl">Lost</div></div>
+        <div class="lost-stat"><div class="lost-stat-val">$${totalCost.toFixed(2)}</div><div class="lost-stat-lbl">Total Value</div></div>`;
+    } else {
+      statBar.style.display = 'none';
+    }
+  }
+
+  if (!lures.length) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+
+  const sorted = [...lures].sort((a,b) => (b.dateLost||'') > (a.dateLost||'') ? 1 : -1);
+  list.innerHTML = sorted.map(l => {
+    const label = l.name + (l.color ? ` (${l.color})` : '');
+    const meta  = [l.dateLost, l.where, l.price ? '$'+parseFloat(l.price).toFixed(2) : ''].filter(Boolean).join(' · ');
+    return `<div class="lost-lure-item" onclick="openLostLureDetail('${esc(l.id)}')">
+      <div class="lost-lure-icon">💀</div>
+      <div class="lost-lure-info">
+        <div class="lost-lure-name">${esc(label)}</div>
+        ${meta ? `<div class="lost-lure-meta">${esc(meta)}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openLostLureDetail(id) {
+  const l = getLostLures().find(x => x.id === id);
+  if (!l) return;
+  document.getElementById('lostLureDetailName').textContent = l.name + (l.color ? ` (${l.color})` : '');
+  const fields = [
+    {label:'Lure Name',      value: l.name     ||'—'},
+    {label:'Color',          value: l.color    ||'—'},
+    {label:'Brand',          value: l.brand    ||'—'},
+    {label:'Details',        value: l.details  ||'—'},
+    {label:'Price',          value: l.price    ? '$'+parseFloat(l.price).toFixed(2) : '—'},
+    {label:'Date Lost',      value: l.dateLost ||'—'},
+    {label:'Where Lost',     value: l.where    ||'—'},
+    {label:'Cause of Death', value: l.cause    ||'—'},
+  ];
+  document.getElementById('lostLureDetailGrid').innerHTML = fields.map(f =>
+    `<div class="gear-detail-item"><div class="gear-detail-label">${f.label}</div><div class="gear-detail-value">${esc(f.value)}</div></div>`
+  ).join('');
+  document.getElementById('lleNameInput').value    = l.name     || '';
+  document.getElementById('lleColorInput').value   = l.color    || '';
+  document.getElementById('lleBrandInput').value   = l.brand    || '';
+  document.getElementById('llePriceInput').value   = l.price    || '';
+  document.getElementById('lleDetailsInput').value = l.details  || '';
+  document.getElementById('lleDateInput').value    = l.dateLost || '';
+  document.getElementById('lleWhereInput').value   = l.where    || '';
+  document.getElementById('lleCauseInput').value   = l.cause    || '';
+  document.getElementById('lostLureEditForm').classList.remove('show');
+  document.getElementById('lostLureDetailActions').innerHTML = `
+    <button class="btn btn-outline" onclick="toggleLostLureEditForm()">✏️ Edit</button>
+    <button class="btn btn-danger"  onclick="deleteLostLure('${esc(id)}')">🗑 Delete</button>
+    <button class="btn btn-primary" id="lostLureEditSaveBtn" onclick="saveLostLureEdit('${esc(id)}')" style="display:none">💾 Save</button>
+    <button class="btn btn-outline" id="lostLureEditCancelBtn" onclick="toggleLostLureEditForm()" style="display:none">Cancel</button>`;
+  navTo('page-lost-lure-detail');
+}
+
+function toggleLostLureEditForm() {
+  const form    = document.getElementById('lostLureEditForm');
+  const saveBtn = document.getElementById('lostLureEditSaveBtn');
+  const canBtn  = document.getElementById('lostLureEditCancelBtn');
+  const editBtn = document.querySelector('#lostLureDetailActions .btn-outline');
+  const show    = form.classList.toggle('show');
+  saveBtn.style.display = show ? '' : 'none';
+  canBtn.style.display  = show ? '' : 'none';
+  if (editBtn) editBtn.style.display = show ? 'none' : '';
+}
+
+function saveLostLureEdit(id) {
+  const name = document.getElementById('lleNameInput').value.trim();
+  if (!name) { showToast('Lure name is required.','error'); return; }
+  const lures = getLostLures();
+  const idx   = lures.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  lures[idx] = { ...lures[idx], name,
+    color:    document.getElementById('lleColorInput').value.trim(),
+    brand:    document.getElementById('lleBrandInput').value.trim(),
+    price:    document.getElementById('llePriceInput').value,
+    details:  document.getElementById('lleDetailsInput').value.trim(),
+    dateLost: document.getElementById('lleDateInput').value,
+    where:    document.getElementById('lleWhereInput').value.trim(),
+    cause:    document.getElementById('lleCauseInput').value.trim(),
+  };
+  saveLostLuresLS(lures);
+  showToast('Lost lure updated!','success');
+  navBack();
+  renderLostLures();
+}
+
+function submitLostLure() {
+  const name = document.getElementById('llName').value.trim();
+  if (!name) { showToast('Lure name is required!','error'); return; }
+  const lures = getLostLures();
+  const entry = {
+    id:       Date.now().toString(36) + Math.random().toString(36).slice(2),
+    name,
+    color:    document.getElementById('llColor').value.trim(),
+    brand:    document.getElementById('llBrand').value.trim(),
+    price:    document.getElementById('llPrice').value,
+    details:  document.getElementById('llDetails').value.trim(),
+    dateLost: document.getElementById('llDate').value,
+    where:    document.getElementById('llWhere').value.trim(),
+    cause:    document.getElementById('llCause').value.trim(),
+  };
+  lures.push(entry);
+  saveLostLuresLS(lures);
+  showToast('💀 Lure logged as lost!','success');
+  resetLostLureForm();
+  navBack();
+  renderLostLures();
+}
+
+function deleteLostLure(id) {
+  if (!confirm('Remove this lure from your lost list?')) return;
+  saveLostLuresLS(getLostLures().filter(x => x.id !== id));
+  showToast('Removed.','success');
+  navBack();
+  renderLostLures();
+}
+
+function resetLostLureForm() {
+  ['llName','llColor','llBrand','llPrice','llDetails','llWhere','llCause'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('llDate').value = new Date().toISOString().slice(0,10);
+  document.getElementById('lostLureFormTitle').textContent = 'Log Lost Lure';
+  document.getElementById('lostLureSaveBtn').textContent   = '💀 Save';
 }
 
 /* ═══════════════════════════════════════════════════════════
