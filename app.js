@@ -759,13 +759,37 @@ function toggleTackleEditForm() {
   if (editBtn) editBtn.style.display = show ? 'none' : '';
 }
 
-function saveTackleEdit(i) {
+async function saveTackleEdit(i) {
   const name = document.getElementById('teNameInput').value.trim();
   if (!name) { showToast('Lure name is required.','error'); return; }
   const tackle = getTackle();
+  const oldName = (tackle[i].name || '').trim();
   tackle[i] = { name, color: document.getElementById('teColorInput').value.trim(), brand: document.getElementById('teBrandInput').value.trim(), details: document.getElementById('teDetailsInput').value.trim() };
   saveTackle(tackle);
-  showToast('Lure updated!','success');
+
+  // If the name actually changed, carry the rename over to every past
+  // catch logged under the old lure name (instead of leaving them
+  // orphaned as a custom lure with the old name).
+  if (oldName && oldName !== name) {
+    showLoading('Updating past catches…');
+    try {
+      const resp = await fetch(CONFIG.WEB_APP_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'renameLure', oldName, newName: name }),
+      });
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+      allCatches.forEach(c => { if ((c.lure||'').trim() === oldName) c.lure = name; });
+      applyFilters();
+      showToast(data.updated ? `Lure updated! ${data.updated} catch(es) relinked.` : 'Lure updated!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Lure renamed, but updating past catches failed: ' + err.message, 'error');
+    } finally { hideLoading(); }
+  } else {
+    showToast('Lure updated!','success');
+  }
+
   navBack();
   renderTackleList();
   refreshLureDropdown();
