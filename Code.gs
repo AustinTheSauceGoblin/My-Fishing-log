@@ -13,7 +13,7 @@
 //  New catches will fill them automatically.
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_ID    = "10rqVPyLthOjmbVY0z9k8bPjidEKc7LK0nhCLo2pVY-s";
+const SHEET_ID    = "YOUR_SHEET_ID_HERE";
 const SHEET_TAB   = "Catches";
 const APPDATA_TAB = "AppData";
 const SHOPS_TAB   = "FishShops";

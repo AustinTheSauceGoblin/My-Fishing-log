@@ -262,6 +262,17 @@
     .shop-detail-photo { width: 100%; height: auto; max-height: 70vh; object-fit: contain; display: block; background: #111; }
     .shop-detail-placeholder { width: 100%; height: 200px; background: linear-gradient(135deg,#fff3e0,#ffe0b2); display: flex; align-items: center; justify-content: center; font-size: 4rem; }
 
+    /* ── LOST LURES ── */
+    .lost-lure-item { display: flex; align-items: center; gap: 10px; background: #fff8f8; border-radius: 9px; padding: 10px 13px; border: 1px solid rgba(184,76,42,.2); cursor: pointer; transition: border-color .15s; box-shadow: var(--shadow); margin-bottom: 7px; }
+    .lost-lure-item:hover { border-color: var(--rust); }
+    .lost-lure-icon { font-size: 1.2rem; flex-shrink: 0; }
+    .lost-lure-info { flex: 1; min-width: 0; }
+    .lost-lure-name { font-weight: 500; font-size: .9rem; }
+    .lost-lure-meta { font-family: 'DM Mono', monospace; font-size: .66rem; color: var(--rust); margin-top: 1px; }
+    .lost-stat-bar { display: flex; gap: 16px; flex-wrap: wrap; background: #fff0ee; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; border: 1px solid rgba(184,76,42,.15); }
+    .lost-stat-val { font-family: 'Playfair Display', serif; font-size: 1.3rem; font-weight: 700; color: var(--rust); }
+    .lost-stat-lbl { font-family: 'DM Mono', monospace; font-size: .6rem; color: #888; text-transform: uppercase; letter-spacing: .08em; }
+
     /* ── HOW TO USE PAGE ── */
     .howto-section { background: #fff; border-radius: var(--r); border: 1px solid var(--line); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
     .howto-section-header { display: flex; align-items: center; gap: 12px; padding: 16px 18px; cursor: pointer; user-select: none; }
@@ -585,6 +596,7 @@
         Home
       </button>
       <span class="nav-title">🧰 Tackle Box</span>
+      <button class="btn btn-danger btn-sm nav-action" onclick="navTo('page-lost-lures')" style="font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase">💀 Lost Lures</button>
     </div>
     <div class="page-content">
       <p style="font-size:.84rem;color:#888;margin-bottom:16px">Tap a lure to view details or edit. Shows as "Name (Color)" in the catch form.</p>
@@ -628,6 +640,109 @@
     </div>
   </div>
 
+
+  <!-- ════════════════════ LOST LURES PAGE ════════════════════ -->
+  <div class="page" id="page-lost-lures">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="navBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Tackle Box
+      </button>
+      <span class="nav-title">💀 Lost Lures</span>
+      <button class="btn btn-danger btn-sm nav-action" onclick="navTo('page-lost-lure-add')" style="font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase">+ Add</button>
+    </div>
+    <div class="page-content">
+      <div class="lost-stat-bar" id="lostStatBar" style="display:none"></div>
+      <div id="lostLureList"></div>
+      <div id="lostLureEmpty" class="empty-state" style="display:none">
+        <div class="fish-big">🪱</div>
+        <h3>No lost lures yet</h3>
+        <p>Tap "+ Add" to log your first casualty.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ ADD LOST LURE PAGE ════════════════════ -->
+  <div class="page" id="page-lost-lure-add">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="navBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Lost Lures
+      </button>
+      <span class="nav-title" id="lostLureFormTitle">Log Lost Lure</span>
+    </div>
+    <div class="form-wrap">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Lure Name *</label>
+          <input type="text" id="llName" placeholder="Spinnerbait, Senko…" />
+        </div>
+        <div class="form-group">
+          <label>Color</label>
+          <input type="text" id="llColor" placeholder="Chartreuse" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Brand</label>
+          <input type="text" id="llBrand" placeholder="Strike King" />
+        </div>
+        <div class="form-group">
+          <label>Price ($)</label>
+          <input type="number" id="llPrice" step="0.01" min="0" placeholder="12.99" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Details</label>
+        <input type="text" id="llDetails" placeholder="3/8 oz, #4 hook…" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date Lost</label>
+          <input type="date" id="llDate" />
+        </div>
+        <div class="form-group">
+          <label>Where Lost</label>
+          <input type="text" id="llWhere" placeholder="Dock pilings, submerged log…" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Cause of Death</label>
+        <input type="text" id="llCause" placeholder="Snapped off on a big hit, hung up on a stump…" />
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-outline" onclick="navBack()">Cancel</button>
+        <button class="btn btn-danger" id="lostLureSaveBtn" onclick="submitLostLure()">💀 Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ LOST LURE DETAIL PAGE ════════════════════ -->
+  <div class="page" id="page-lost-lure-detail">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="navBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Lost Lures
+      </button>
+      <span class="nav-title">Lure Details</span>
+    </div>
+    <div class="page-content">
+      <div style="text-align:center;font-size:3rem;margin-bottom:8px">💀</div>
+      <div class="gear-detail-name" id="lostLureDetailName"></div>
+      <div class="gear-detail-grid" id="lostLureDetailGrid"></div>
+      <div class="gear-edit-form" id="lostLureEditForm">
+        <input type="text"   id="lleNameInput"    placeholder="Lure Name *" />
+        <input type="text"   id="lleColorInput"   placeholder="Color" />
+        <input type="text"   id="lleBrandInput"   placeholder="Brand" />
+        <input type="number" id="llePriceInput"   placeholder="Price ($)" step="0.01" min="0" />
+        <input type="text"   id="lleDetailsInput" placeholder="Details" />
+        <input type="date"   id="lleDateInput" />
+        <input type="text"   id="lleWhereInput"   placeholder="Where Lost" />
+        <input type="text"   id="lleCauseInput"   placeholder="Cause of Death" />
+      </div>
+      <div class="detail-actions" id="lostLureDetailActions" style="margin-top:16px"></div>
+    </div>
+  </div>
 
   <!-- ════════════════════ ROD RACK PAGE ════════════════════ -->
   <div class="page" id="page-rods">
