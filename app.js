@@ -39,6 +39,7 @@ function getCatchPageSize() {
 
 /* ─── APP STATE ─────────────────────────────────────────── */
 let allCatches = [];
+let _bestDayCatches = [];
 let filtered   = [];
 let _pageStack = ['page-home'];  // navigation history
 
@@ -1126,9 +1127,48 @@ function renderStats(catches) {
     document.getElementById('statBiggest').textContent    = '—';
     document.getElementById('statBiggestFish').textContent = '';
   }
+
+  const best = computeBestDay(catches);
+  _bestDayCatches = best.catches;
+  if (best.key) {
+    const [y,m,d] = best.key.split('-').map(Number);
+    document.getElementById('statBestDay').textContent = new Date(y,m-1,d).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+    document.getElementById('statBestDayCount').textContent = best.catches.length + (best.catches.length===1 ? ' fish · tap →' : ' fish · tap →');
+  } else {
+    document.getElementById('statBestDay').textContent = '—';
+    document.getElementById('statBestDayCount').textContent = '';
+  }
+}
+
+// Groups catches by calendar day (local date, ignoring time) and returns
+// the day with the most catches, so "Best Day" reflects a single outing
+// rather than being skewed by timezone-edge timestamps.
+function computeBestDay(catches) {
+  const map = {};
+  catches.forEach(c => {
+    if (!c.date) return;
+    const d = new Date(c.date);
+    if (isNaN(d)) return;
+    const key = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    (map[key] = map[key] || []).push(c);
+  });
+  let bestKey = null, bestCatches = [];
+  Object.entries(map).forEach(([k,arr]) => { if (arr.length > bestCatches.length) { bestKey = k; bestCatches = arr; } });
+  return { key: bestKey, catches: bestCatches };
+}
+
+function openBestDayCatches() {
+  if (!_bestDayCatches.length) return;
+  const sorted = [..._bestDayCatches].sort((a,b)=>new Date(a.date)-new Date(b.date));
+  const dateStr = new Date(sorted[0].date).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'});
+  document.getElementById('bestDayCatchesTitle').textContent = '🏆 '+dateStr+' ('+sorted.length+')';
+  document.getElementById('bestDayCatchesBody').innerHTML = sorted.map((c,i)=>buildCatchCard(c,i,false)).join('');
+  navTo('page-best-day-catches');
 }
 function renderEmptyStats() {
-  ['statTotal','statSpecies','statBiggest','statTrips','statStates','statBuddies','statSpots'].forEach(id => document.getElementById(id).textContent='—');
+  ['statTotal','statSpecies','statBiggest','statTrips','statStates','statBuddies','statSpots','statBestDay'].forEach(id => document.getElementById(id).textContent='—');
+  document.getElementById('statBestDayCount').textContent = '';
+  _bestDayCatches = [];
 }
 
 /* ─── SPECIES BREAKDOWN ─────────────────────────────────── */
