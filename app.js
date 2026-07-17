@@ -1769,8 +1769,8 @@ function openEditCatch(id) {
 /* ─── DRILL-DOWN (species / state) ──────────────────────── */
 function openDrilldown(type, value) {
   let subset, title;
-  if (type==='species') { subset=allCatches.filter(c=>c.fish===value); title=`${getFishEmoji(value)} ${value} (${subset.length})`; }
-  else                  { subset=allCatches.filter(c=>c.state&&c.state.trim()===value); title=`${STATE_EMOJI[value]||'📍'} ${value} (${subset.length})`; }
+  if (type==='species') { subset=filtered.filter(c=>c.fish===value); title=`${getFishEmoji(value)} ${value} (${subset.length})`; }
+  else                  { subset=filtered.filter(c=>c.state&&c.state.trim()===value); title=`${STATE_EMOJI[value]||'📍'} ${value} (${subset.length})`; }
   document.getElementById('drilldownTitle').textContent = title;
   const sorted=[...subset].sort((a,b)=>new Date(b.date)-new Date(a.date));
   document.getElementById('drilldownBody').innerHTML = sorted.map((c,i)=>buildCatchCard(c,i,false)).join('');
