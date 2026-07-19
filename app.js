@@ -707,6 +707,18 @@ function resetLostLureForm() {
 ═══════════════════════════════════════════════════════════ */
 function tackleLabelFor(t) { return t.name + (t.color ? ` (${t.color})` : ''); }
 
+// A catch matches a tackle item if its stored lure equals the full
+// "Name (Color)" label — or, for lures logged before color existed,
+// the bare name (only when the tackle item itself has no color set,
+// so two different colors of the same lure don't collide).
+function lureMatches(c, t) {
+  const stored = (c.lure || '').trim();
+  if (!stored) return false;
+  if (stored === tackleLabelFor(t)) return true;
+  if (!t.color && stored === t.name) return true;
+  return false;
+}
+
 function renderTackleList() {
   const tackle = getTackle();
   const el = document.getElementById('tackleList');
@@ -715,7 +727,7 @@ function renderTackleList() {
     return;
   }
   el.innerHTML = tackle.map((t,i) => {
-    const count = allCatches.filter(c => c.lure === t.name).length;
+    const count = allCatches.filter(c => lureMatches(c, t)).length;
     return `<div class="gear-item" onclick="openTackleDetail(${i})">
       <div class="gear-item-icon">🪱</div>
       <div class="gear-item-info">
@@ -763,29 +775,41 @@ function toggleTackleEditForm() {
 async function saveTackleEdit(i) {
   const name = document.getElementById('teNameInput').value.trim();
   if (!name) { showToast('Lure name is required.','error'); return; }
-  const tackle = getTackle();
-  const oldName = (tackle[i].name || '').trim();
-  tackle[i] = { name, color: document.getElementById('teColorInput').value.trim(), brand: document.getElementById('teBrandInput').value.trim(), details: document.getElementById('teDetailsInput').value.trim() };
+  const tackle  = getTackle();
+  const oldT    = tackle[i];
+  const oldLabel = tackleLabelFor(oldT);
+  const newT    = { name, color: document.getElementById('teColorInput').value.trim(), brand: document.getElementById('teBrandInput').value.trim(), details: document.getElementById('teDetailsInput').value.trim() };
+  const newLabel = tackleLabelFor(newT);
+  tackle[i] = newT;
   saveTackle(tackle);
 
-  // If the name actually changed, carry the rename over to every past
-  // catch logged under the old lure name (instead of leaving them
-  // orphaned as a custom lure with the old name).
-  if (oldName && oldName !== name) {
+  // If the name and/or color actually changed, carry it over to every
+  // past catch logged under the old lure (instead of leaving them
+  // orphaned as a custom lure under the old name/color). Catches logged
+  // before this lure had a color may still be stored under the bare
+  // old name, so we check for that too.
+  const oldCandidates = [...new Set([oldLabel, oldT.name].filter(Boolean))];
+  const needsRename = oldLabel !== newLabel;
+  if (needsRename) {
     showLoading('Updating past catches…');
     try {
-      const resp = await fetch(CONFIG.WEB_APP_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'renameLure', oldName, newName: name }),
-      });
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      allCatches.forEach(c => { if ((c.lure||'').trim() === oldName) c.lure = name; });
+      let totalUpdated = 0;
+      for (const oldName of oldCandidates) {
+        if (oldName === newLabel) continue;
+        const resp = await fetch(CONFIG.WEB_APP_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'renameLure', oldName, newName: newLabel }),
+        });
+        const data = await resp.json();
+        if (data.error) throw new Error(data.error);
+        totalUpdated += (data.updated || 0);
+      }
+      allCatches.forEach(c => { if (oldCandidates.includes((c.lure||'').trim())) c.lure = newLabel; });
       applyFilters();
-      showToast(data.updated ? `Lure updated! ${data.updated} catch(es) relinked.` : 'Lure updated!', 'success');
+      showToast(totalUpdated ? `Lure updated! ${totalUpdated} catch(es) relinked.` : 'Lure updated!', 'success');
     } catch (err) {
       console.error(err);
-      showToast('Lure renamed, but updating past catches failed: ' + err.message, 'error');
+      showToast('Lure updated, but updating past catches failed: ' + err.message, 'error');
     } finally { hideLoading(); }
   } else {
     showToast('Lure updated!','success');
@@ -822,7 +846,7 @@ function refreshLureDropdown() {
   sel.innerHTML = '<option value="">— Tackle Box —</option>';
   getTackle().forEach(t => {
     const o = document.createElement('option');
-    o.value = t.name; o.textContent = tackleLabelFor(t);
+    o.value = tackleLabelFor(t); o.textContent = tackleLabelFor(t);
     sel.appendChild(o);
   });
   sel.value = cur;
@@ -1741,8 +1765,8 @@ function openEditCatch(id) {
     } catch { setDateTimeNow('fDate'); }
   } else { setDateTimeNow('fDate'); }
   refreshLureDropdown();
-  const matchedLure = getTackle().find(t=>t.name===c.lure);
-  document.getElementById('fLure').value = matchedLure ? c.lure : '';
+  const matchedLure = getTackle().find(t=>lureMatches(c, t));
+  document.getElementById('fLure').value = matchedLure ? tackleLabelFor(matchedLure) : '';
   if (!matchedLure) document.getElementById('fLureCustom').value = c.lure || '';
   refreshRodDropdown();
   document.getElementById('fRod').value = c.rod || '';
