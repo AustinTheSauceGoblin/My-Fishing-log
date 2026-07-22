@@ -12,7 +12,7 @@
 //  column R in row 1. New catches will fill it automatically.
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_ID    = "10rqVPyLthOjmbVY0z9k8bPjidEKc7LK0nhCLo2pVY-s";
+const SHEET_ID    = "YOUR_SHEET_ID_HERE";
 const SHEET_TAB   = "Catches";
 const APPDATA_TAB = "AppData";
 const SHOPS_TAB   = "FishShops";
@@ -94,7 +94,11 @@ function getCatches() {
     lon:      get(row,'lon')  !== '' ? Number(get(row,'lon'))  : '',
     sunrise:  get(row,'sunrise'),
     sunset:   get(row,'sunset'),
-    trailer:  get(row,'trailer'),
+    // Fall back to the fixed column position if the "Trailer" header
+    // hasn't been added to the sheet yet — addCatch/editCatch always
+    // write it there regardless of headers, so this keeps read/write
+    // in sync even before the header exists.
+    trailer:  hIdx['trailer']!==undefined ? get(row,'trailer') : (row[COL.TRAILER]!==undefined && row[COL.TRAILER]!==null ? String(row[COL.TRAILER]) : ''),
   }));
   return { catches };
 }
