@@ -112,7 +112,7 @@ let _syncTimer   = null;
 
 function queueSyncPush(localKey, value) {
   if (!CONFIG.WEB_APP_URL) return;
-  const sheetKey = { [pfx()+'tackle']:'tackle', [pfx()+'rods']:'rods', [pfx()+'favs']:'favorites', [pfx()+'pinnedfavs']:'pinnedfavs', [pfx()+'settings']:'settings', [pfx()+'crops']:'crops', [pfx()+'lostlures']:'lostlures' }[localKey];
+  const sheetKey = { [pfx()+'tackle']:'tackle', [pfx()+'rods']:'rods', [pfx()+'favs']:'favorites', [pfx()+'pinnedfavs']:'pinnedfavs', [pfx()+'settings']:'settings', [pfx()+'crops']:'crops', [pfx()+'lostlures']:'lostlures', [pfx()+'hooks']:'hooks' }[localKey];
   if (!sheetKey) return;
   _syncPending[sheetKey] = value;
   clearTimeout(_syncTimer);
@@ -157,6 +157,7 @@ async function pullAndMergeAppData() {
       settings:   pfx()+'settings',
       crops:      pfx()+'crops',
       lostlures:  pfx()+'lostlures',
+      hooks:      pfx()+'hooks',
     };
 
     Object.entries(sheetToLocal).forEach(([sheetKey, localKey]) => {
@@ -231,6 +232,8 @@ function navTo(pageId) {
   if (pageId === 'page-lost-lures')       renderLostLures();
   if (pageId === 'page-lost-lure-add' && !_skipLostLureReset) resetLostLureForm();
   _skipLostLureReset = false;
+  if (pageId === 'page-hooks')     renderHooks();
+  if (pageId === 'page-hook-add')  resetHookForm();
   if (pageId === 'page-shops')       { renderShops(); populateShopStateFilter(); }
   if (pageId === 'page-shop-add' && !_skipShopReset) resetShopForm();
   _skipShopReset = false;
@@ -740,20 +743,30 @@ function lureMatches(c, t) {
   return false;
 }
 
+let tackleTypeFilter = '';
+
+function setTackleTypeFilter(type) {
+  tackleTypeFilter = type;
+  document.querySelectorAll('#tackleTypeTabs .seg-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+  renderTackleList();
+}
+
 function renderTackleList() {
-  const tackle = getTackle();
+  const tackle = getTackle().map((t,i)=>({t,i})).filter(({t}) => !tackleTypeFilter || t.plasticType === tackleTypeFilter);
   const el = document.getElementById('tackleList');
   if (!tackle.length) {
-    el.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:.76rem;color:#bbb;text-align:center;padding:24px">No lures yet. Add one below.</div>';
+    el.innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:.76rem;color:#bbb;text-align:center;padding:24px">${tackleTypeFilter ? 'No '+tackleTypeFilter.toLowerCase()+' lures yet.' : 'No lures yet. Add one below.'}</div>`;
     return;
   }
-  el.innerHTML = tackle.map((t,i) => {
+  el.innerHTML = tackle.map(({t,i}) => {
     const count = allCatches.filter(c => lureMatches(c, t)).length;
     return `<div class="gear-item" onclick="openTackleDetail(${i})">
       <div class="gear-item-icon">🪱</div>
       <div class="gear-item-info">
         <div class="gear-item-name">${esc(tackleLabelFor(t))}</div>
-        ${t.brand ? `<div class="gear-item-detail">${esc(t.brand)}</div>` : ''}
+        ${[t.brand, t.plasticType].filter(Boolean).map(esc).join(' · ') ? `<div class="gear-item-detail">${[t.brand, t.plasticType].filter(Boolean).map(esc).join(' · ')}</div>` : ''}
       </div>
       <div class="gear-item-actions" onclick="event.stopPropagation()">
         ${count > 0 ? `<span class="catch-count-badge">🎣 ${count}</span>` : ''}
@@ -770,11 +783,13 @@ function openTackleDetail(i) {
     <div class="gear-detail-item"><div class="gear-detail-label">Lure Name</div><div class="gear-detail-value">${esc(t.name||'—')}</div></div>
     <div class="gear-detail-item"><div class="gear-detail-label">Color</div><div class="gear-detail-value">${esc(t.color||'—')}</div></div>
     <div class="gear-detail-item"><div class="gear-detail-label">Brand</div><div class="gear-detail-value">${esc(t.brand||'—')}</div></div>
-    <div class="gear-detail-item"><div class="gear-detail-label">Details</div><div class="gear-detail-value">${esc(t.details||'—')}</div></div>`;
+    <div class="gear-detail-item"><div class="gear-detail-label">Details</div><div class="gear-detail-value">${esc(t.details||'—')}</div></div>
+    <div class="gear-detail-item"><div class="gear-detail-label">Plastic Type</div><div class="gear-detail-value">${esc(t.plasticType||'—')}</div></div>`;
   document.getElementById('teNameInput').value    = t.name    || '';
   document.getElementById('teColorInput').value   = t.color   || '';
   document.getElementById('teBrandInput').value   = t.brand   || '';
   document.getElementById('teDetailsInput').value = t.details || '';
+  document.getElementById('tePlasticTypeInput').value = t.plasticType || '';
   const editForm = document.getElementById('tackleEditForm');
   editForm.classList.remove('show');
   document.getElementById('tackleDetailActions').innerHTML = `
@@ -799,7 +814,7 @@ async function saveTackleEdit(i) {
   const tackle  = getTackle();
   const oldT    = tackle[i];
   const oldLabel = tackleLabelFor(oldT);
-  const newT    = { name, color: document.getElementById('teColorInput').value.trim(), brand: document.getElementById('teBrandInput').value.trim(), details: document.getElementById('teDetailsInput').value.trim() };
+  const newT    = { name, color: document.getElementById('teColorInput').value.trim(), brand: document.getElementById('teBrandInput').value.trim(), details: document.getElementById('teDetailsInput').value.trim(), plasticType: document.getElementById('tePlasticTypeInput').value };
   const newLabel = tackleLabelFor(newT);
   tackle[i] = newT;
   saveTackle(tackle);
@@ -845,9 +860,10 @@ function addTackle() {
   const name = document.getElementById('tName').value.trim();
   if (!name) { showToast('Enter a lure name.','error'); return; }
   const tackle = getTackle();
-  tackle.push({ name, color: document.getElementById('tColor').value.trim(), brand: document.getElementById('tBrand').value.trim(), details: document.getElementById('tDetails').value.trim() });
+  tackle.push({ name, color: document.getElementById('tColor').value.trim(), brand: document.getElementById('tBrand').value.trim(), details: document.getElementById('tDetails').value.trim(), plasticType: document.getElementById('tPlasticType').value });
   saveTackle(tackle);
   ['tName','tColor','tBrand','tDetails'].forEach(id => document.getElementById(id).value='');
+  document.getElementById('tPlasticType').value = '';
   renderTackleList(); refreshLureDropdown();
   showToast('Lure added!','success');
 }
@@ -871,6 +887,151 @@ function refreshLureDropdown() {
     sel.appendChild(o);
   });
   sel.value = cur;
+  handleLureChange();
+}
+
+// Trailers only make sense on a hard-plastic bait, and can only be one
+// of your soft plastics — so the Trailer field only appears once a
+// hard-plastic lure is selected, and its dropdown is scoped to just
+// the soft-plastic entries in the Tackle Box.
+function handleLureChange() {
+  const group = document.getElementById('fTrailerGroup');
+  const sel   = document.getElementById('fTrailer');
+  const lureVal = document.getElementById('fLure').value;
+  const matched = getTackle().find(t => tackleLabelFor(t) === lureVal);
+  const isHardPlastic = matched && matched.plasticType === 'Hard Plastic';
+
+  if (!isHardPlastic) {
+    group.style.display = 'none';
+    sel.value = '';
+    return;
+  }
+  group.style.display = '';
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Soft Plastic Trailer —</option>';
+  getTackle().filter(t => t.plasticType === 'Soft Plastic').forEach(t => {
+    const o = document.createElement('option');
+    o.value = tackleLabelFor(t); o.textContent = tackleLabelFor(t);
+    sel.appendChild(o);
+  });
+  sel.value = cur;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HOOKS
+   Not linked to catches — just a reference list, so hooks are
+   rendered as "catch cards" (buildCatchCard's visual style) for
+   a consistent tap-to-view-details feel.
+═══════════════════════════════════════════════════════════ */
+function getHooks()     { return ls.get(pfx()+'hooks', []); }
+function saveHooksLS(a) { setSynced(pfx()+'hooks', a); }
+
+function buildHookCard(h, i) {
+  const meta = [h.brand, h.size].filter(Boolean);
+  return `<div class="catch-card" style="animation-delay:${Math.min(i,8)*40}ms" onclick="openHookDetail('${esc(h.id)}')">
+    <div class="catch-photo-wrap">
+      <div class="catch-photo-placeholder">🪝</div>
+    </div>
+    <div class="catch-body">
+      <div class="catch-fish-name">${esc(h.description||'Hook')}</div>
+      ${meta.length ? `<div class="catch-meta">${meta.map(m=>`<span>${esc(m)}</span>`).join('')}</div>` : ''}
+      ${h.usedFor ? `<div class="catch-tags"><span class="tag">${esc(h.usedFor)}</span></div>` : ''}
+      <div class="catch-tap-hint">tap for details &amp; edit →</div>
+    </div>
+  </div>`;
+}
+
+function renderHooks() {
+  const hooks = getHooks();
+  const list  = document.getElementById('hookList');
+  const empty = document.getElementById('hookEmpty');
+  if (!hooks.length) {
+    list.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  list.innerHTML = hooks.map((h,i) => buildHookCard(h,i)).join('');
+}
+
+function addHook() {
+  const description = document.getElementById('hDescription').value.trim();
+  if (!description) { showToast('A description is required.','error'); return; }
+  const hooks = getHooks();
+  hooks.push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2),
+    description,
+    brand:   document.getElementById('hBrand').value.trim(),
+    size:    document.getElementById('hSize').value.trim(),
+    usedFor: document.getElementById('hUsedFor').value.trim(),
+  });
+  saveHooksLS(hooks);
+  showToast('🪝 Hook added!','success');
+  navBack();
+  renderHooks();
+}
+
+function resetHookForm() {
+  ['hDescription','hBrand','hSize','hUsedFor'].forEach(id => document.getElementById(id).value = '');
+}
+
+function openHookDetail(id) {
+  const h = getHooks().find(x => x.id === id);
+  if (!h) return;
+  document.getElementById('hookDetailName').textContent = h.description || 'Hook';
+  document.getElementById('hookDetailGrid').innerHTML = [
+    {label:'Description', value: h.description || '—'},
+    {label:'Brand',        value: h.brand       || '—'},
+    {label:'Size',         value: h.size        || '—'},
+    {label:'Used For',     value: h.usedFor     || '—'},
+  ].map(f => `<div class="gear-detail-item"><div class="gear-detail-label">${f.label}</div><div class="gear-detail-value">${esc(f.value)}</div></div>`).join('');
+  document.getElementById('heDescriptionInput').value = h.description || '';
+  document.getElementById('heBrandInput').value       = h.brand       || '';
+  document.getElementById('heSizeInput').value        = h.size        || '';
+  document.getElementById('heUsedForInput').value      = h.usedFor     || '';
+  document.getElementById('hookEditForm').classList.remove('show');
+  document.getElementById('hookDetailActions').innerHTML = `
+    <button class="btn btn-outline" onclick="toggleHookEditForm()">✏️ Edit</button>
+    <button class="btn btn-danger"  onclick="deleteHook('${esc(id)}')">🗑 Delete</button>
+    <button class="btn btn-primary" id="hookEditSaveBtn" onclick="saveHookEdit('${esc(id)}')" style="display:none">💾 Save</button>
+    <button class="btn btn-outline" id="hookEditCancelBtn" onclick="toggleHookEditForm()" style="display:none">Cancel</button>`;
+  navTo('page-hook-detail');
+}
+
+function toggleHookEditForm() {
+  const form    = document.getElementById('hookEditForm');
+  const saveBtn = document.getElementById('hookEditSaveBtn');
+  const canBtn  = document.getElementById('hookEditCancelBtn');
+  const editBtn = document.querySelector('#hookDetailActions .btn-outline');
+  const show    = form.classList.toggle('show');
+  saveBtn.style.display = show ? '' : 'none';
+  canBtn.style.display  = show ? '' : 'none';
+  if (editBtn) editBtn.style.display = show ? 'none' : '';
+}
+
+function saveHookEdit(id) {
+  const description = document.getElementById('heDescriptionInput').value.trim();
+  if (!description) { showToast('A description is required.','error'); return; }
+  const hooks = getHooks();
+  const idx   = hooks.findIndex(x => x.id === id);
+  if (idx < 0) return;
+  hooks[idx] = { ...hooks[idx], description,
+    brand:   document.getElementById('heBrandInput').value.trim(),
+    size:    document.getElementById('heSizeInput').value.trim(),
+    usedFor: document.getElementById('heUsedForInput').value.trim(),
+  };
+  saveHooksLS(hooks);
+  showToast('Hook updated!','success');
+  navBack();
+  renderHooks();
+}
+
+function deleteHook(id) {
+  if (!confirm('Remove this hook from your list?')) return;
+  saveHooksLS(getHooks().filter(x => x.id !== id));
+  showToast('Removed.','success');
+  navBack();
+  renderHooks();
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -1037,6 +1198,7 @@ async function submitCatch() {
     lon:           document.getElementById('fLon').value !== '' ? parseFloat(document.getElementById('fLon').value) : '',
     sunrise:       document.getElementById('fSunrise').value,
     sunset:        document.getElementById('fSunset').value,
+    trailer:       document.getElementById('fTrailer').value,
   };
 
   try {
@@ -1133,7 +1295,7 @@ function applyFilters() {
       if (isNaN(d) || d.getMonth() !== parseInt(monthVal)) return false;
     }
     if (search) {
-      const blob = [c.fish,c.location,c.state,c.lure,c.trip,c.notes,c.fishWith,c.rod].join(' ').toLowerCase();
+      const blob = [c.fish,c.location,c.state,c.lure,c.trailer,c.trip,c.notes,c.fishWith,c.rod].join(' ').toLowerCase();
       if (!blob.includes(search)) return false;
     }
     return true;
@@ -1627,6 +1789,7 @@ function buildCatchCard(c, i, isFavCard) {
         ${c.state    ?`<span>📍 ${esc(c.state)}</span>`:''}
         ${c.location ?`<span>🗺️ ${esc(c.location)}</span>`:''}
         ${c.lure     ?`<span>🪱 ${esc(c.lure)}</span>`:''}
+        ${c.trailer  ?`<span>🐛 ${esc(c.trailer)}</span>`:''}
         ${dt         ?`<span>🕐 ${dt}</span>`:''}
       </div>
       ${tags.length?`<div class="catch-tags">${tags.map(t=>`<span class="tag">${esc(t)}</span>`).join('')}</div>`:''}
@@ -1713,6 +1876,7 @@ function openDetail(id) {
     {label: sunIsExact ? 'Sunrise (exact)' : 'Sunrise (est.)', value: sunriseStr},
     {label: sunIsExact ? 'Sunset (exact)'  : 'Sunset (est.)',  value: sunsetStr},
     {label:'Lure / Bait', value: c.lure||'—'},
+    {label:'Trailer', value: c.trailer||'—'},
     {label:'Rod',         value: c.rod||'—'},
     {label:'Fished With', value: c.fishWith||'—'},
     {label:'Trip',        value: c.trip||'—'},
@@ -1789,6 +1953,8 @@ function openEditCatch(id) {
   const matchedLure = getTackle().find(t=>lureMatches(c, t));
   document.getElementById('fLure').value = matchedLure ? tackleLabelFor(matchedLure) : '';
   if (!matchedLure) document.getElementById('fLureCustom').value = c.lure || '';
+  handleLureChange();
+  document.getElementById('fTrailer').value = c.trailer || '';
   refreshRodDropdown();
   document.getElementById('fRod').value = c.rod || '';
   const prev = document.getElementById('fPhotoPreview');

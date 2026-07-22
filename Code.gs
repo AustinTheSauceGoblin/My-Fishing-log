@@ -7,13 +7,12 @@
 //  3. Set YOUR_SHEET_ID_HERE to your actual Sheet ID
 //  4. Save, then Deploy → Manage Deployments → New version → Deploy
 //
-//  NEW COLUMNS in this version (City, Lat, Lon, Sunrise, Sunset):
-//  If you already have a Catches tab, add these 5 headers to
-//  columns M-Q in row 1: City | Lat | Lon | Sunrise | Sunset
-//  New catches will fill them automatically.
+//  NEW COLUMN in this version (Trailer):
+//  If you already have a Catches tab, add a header "Trailer" to
+//  column R in row 1. New catches will fill it automatically.
 // ═══════════════════════════════════════════════════════════
 
-const SHEET_ID    = "10rqVPyLthOjmbVY0z9k8bPjidEKc7LK0nhCLo2pVY-s";
+const SHEET_ID    = "YOUR_SHEET_ID_HERE";
 const SHEET_TAB   = "Catches";
 const APPDATA_TAB = "AppData";
 const SHOPS_TAB   = "FishShops";
@@ -21,12 +20,12 @@ const SHOPS_TAB   = "FishShops";
 const COLS = [
   "ID","Date","Fish","Weight_lbs","Location","State",
   "Lure","Rod","FishWith","Trip","Notes","PhotoUrl",
-  "City","Lat","Lon","Sunrise","Sunset"
+  "City","Lat","Lon","Sunrise","Sunset","Trailer"
 ];
 const COL = {
   ID:0,DATE:1,FISH:2,WEIGHT:3,LOCATION:4,STATE:5,
   LURE:6,ROD:7,FISHWITH:8,TRIP:9,NOTES:10,PHOTOURL:11,
-  CITY:12,LAT:13,LON:14,SUNRISE:15,SUNSET:16
+  CITY:12,LAT:13,LON:14,SUNRISE:15,SUNSET:16,TRAILER:17
 };
 
 const SHOP_COLS = ["ID","Name","Address","City","State","ShopType","Notes","PhotoUrl"];
@@ -95,6 +94,7 @@ function getCatches() {
     lon:      get(row,'lon')  !== '' ? Number(get(row,'lon'))  : '',
     sunrise:  get(row,'sunrise'),
     sunset:   get(row,'sunset'),
+    trailer:  get(row,'trailer'),
   }));
   return { catches };
 }
@@ -116,6 +116,7 @@ function addCatch(data) {
   row[COL.LON]=data.lon!==undefined&&data.lon!=='' ? data.lon : '';
   row[COL.SUNRISE]=data.sunrise ? String(data.sunrise) : '';
   row[COL.SUNSET]=data.sunset   ? String(data.sunset)  : '';
+  row[COL.TRAILER]=data.trailer||'';
   sheet.appendRow(row);
   return { success:true, id };
 }
@@ -146,6 +147,7 @@ function editCatch(data) {
     newRow[COL.LON]=data.lon!==undefined&&data.lon!=='' ? data.lon : (values[i][COL.LON]||'');
     newRow[COL.SUNRISE]=data.sunrise!==undefined ? (data.sunrise ? String(data.sunrise) : '') : String(values[i][COL.SUNRISE]||'');
     newRow[COL.SUNSET]=data.sunset!==undefined   ? (data.sunset  ? String(data.sunset)  : '') : String(values[i][COL.SUNSET]||'');
+    newRow[COL.TRAILER]=data.trailer!==undefined ? (data.trailer||'') : (values[i][COL.TRAILER]||'');
     sheet.getRange(rowNum,1,1,COLS.length).setValues([newRow]);
     return { success:true };
   }
@@ -246,7 +248,7 @@ function deleteShop(id) {
 //  APP DATA SYNC
 // ═══════════════════════════════════════════════════════════
 
-const APPDATA_KEYS = ["tackle","rods","favorites","pinnedfavs","settings","crops","lostlures"];
+const APPDATA_KEYS = ["tackle","rods","favorites","pinnedfavs","settings","crops","lostlures","hooks"];
 
 function getAppData() {
   const sheet = getAppDataSheet();

@@ -233,6 +233,12 @@
     .gear-add-inputs input { font-family: 'DM Sans', sans-serif; font-size: .88rem; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; color: var(--ink); outline: none; width: 100%; transition: border-color .18s; }
     .gear-add-inputs input:focus { border-color: var(--water); }
     .gear-add-btn-row { display: flex; justify-content: flex-end; }
+    .seg-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+    .seg-tab { flex: 1; text-align: center; padding: 8px 6px; border-radius: 8px; border: 1.5px solid var(--line); background: #fff; font-family: 'DM Mono', monospace; font-size: .7rem; letter-spacing: .03em; text-transform: uppercase; cursor: pointer; color: #888; transition: all .15s; }
+    .seg-tab:hover { border-color: var(--water-lt); }
+    .seg-tab.active { background: var(--water); border-color: var(--water); color: #fff; }
+    .gear-add-inputs select { font-family: 'DM Sans', sans-serif; font-size: .88rem; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; color: var(--ink); outline: none; width: 100%; transition: border-color .18s; }
+    .gear-add-inputs select:focus { border-color: var(--water); }
 
     /* ── GEAR DETAIL PAGE ── */
     .gear-detail-icon { font-size: 3rem; text-align: center; margin: 4px 0 16px; }
@@ -449,12 +455,16 @@
         </div>
         <div class="form-group">
           <label>Lure / Bait</label>
-          <select id="fLure"><option value="">— Tackle Box —</option></select>
+          <select id="fLure" onchange="handleLureChange()"><option value="">— Tackle Box —</option></select>
         </div>
       </div>
       <div class="form-group">
         <label>Custom Lure (overrides dropdown)</label>
         <input type="text" id="fLureCustom" placeholder="Type a lure not in your tackle box…" />
+      </div>
+      <div class="form-group" id="fTrailerGroup" style="display:none">
+        <label>Trailer</label>
+        <select id="fTrailer"><option value="">— Soft Plastic Trailer —</option></select>
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -597,10 +607,16 @@
         Home
       </button>
       <span class="nav-title">🧰 Tackle Box</span>
-      <button class="btn btn-danger btn-sm nav-action" onclick="navTo('page-lost-lures')" style="font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase">💀 Lost Lures</button>
+      <button class="btn btn-outline btn-sm nav-action" onclick="navTo('page-hooks')" style="font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase">🪝 Hooks</button>
+      <button class="btn btn-danger btn-sm" onclick="navTo('page-lost-lures')" style="font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase;margin-left:6px">💀 Lost Lures</button>
     </div>
     <div class="page-content">
       <p style="font-size:.84rem;color:#888;margin-bottom:16px">Tap a lure to view details or edit. Shows as "Name (Color)" in the catch form.</p>
+      <div class="seg-tabs" id="tackleTypeTabs">
+        <button class="seg-tab active" data-type="" onclick="setTackleTypeFilter('')">All</button>
+        <button class="seg-tab" data-type="Hard Plastic" onclick="setTackleTypeFilter('Hard Plastic')">Hard Plastic</button>
+        <button class="seg-tab" data-type="Soft Plastic" onclick="setTackleTypeFilter('Soft Plastic')">Soft Plastic</button>
+      </div>
       <div class="gear-list" id="tackleList"></div>
       <div class="gear-add-section">
         <div class="gear-add-label">Add New Lure</div>
@@ -609,6 +625,11 @@
           <input type="text" id="tColor"   placeholder="Color (e.g. Chartreuse)" />
           <input type="text" id="tBrand"   placeholder="Brand (e.g. Strike King)" />
           <input type="text" id="tDetails" placeholder="Details (e.g. 3/8 oz, #4 hook)" />
+          <select id="tPlasticType">
+            <option value="">Plastic Type (optional)</option>
+            <option value="Hard Plastic">Hard Plastic</option>
+            <option value="Soft Plastic">Soft Plastic</option>
+          </select>
         </div>
         <div class="gear-add-btn-row">
           <button class="btn btn-primary btn-sm" onclick="addTackle()">+ Add Lure</button>
@@ -636,6 +657,11 @@
         <input type="text" id="teColorInput"   placeholder="Color" />
         <input type="text" id="teBrandInput"   placeholder="Brand" />
         <input type="text" id="teDetailsInput" placeholder="Details" />
+        <select id="tePlasticTypeInput">
+          <option value="">Plastic Type (optional)</option>
+          <option value="Hard Plastic">Hard Plastic</option>
+          <option value="Soft Plastic">Soft Plastic</option>
+        </select>
       </div>
       <div class="detail-actions" id="tackleDetailActions" style="margin-top:16px"></div>
     </div>
@@ -744,6 +770,87 @@
       <div class="detail-actions" id="lostLureDetailActions" style="margin-top:16px"></div>
     </div>
   </div>
+
+
+  <!-- ════════════════════ HOOKS PAGE ════════════════════ -->
+  <div class="page" id="page-hooks">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="navBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Tackle Box
+      </button>
+      <span class="nav-title">🪝 Hooks</span>
+      <button class="btn btn-primary btn-sm nav-action" onclick="navTo('page-hook-add')" style="font-family:'DM Mono',monospace;font-size:.7rem;letter-spacing:.04em;text-transform:uppercase">+ Add</button>
+    </div>
+    <div class="page-content">
+      <p style="font-size:.84rem;color:#888;margin-bottom:16px">Hooks aren't linked to catches — just a place to keep track of what's in the box.</p>
+      <div class="catch-grid" id="hookList"></div>
+      <div id="hookEmpty" class="empty-state" style="display:none">
+        <div class="fish-big">🪝</div>
+        <h3>No hooks yet</h3>
+        <p>Tap "+ Add" to log your first hook.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ ADD HOOK PAGE ════════════════════ -->
+  <div class="page" id="page-hook-add">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="navBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Hooks
+      </button>
+      <span class="nav-title">+ Add Hook</span>
+    </div>
+    <div class="form-wrap">
+      <div class="form-group">
+        <label>Description *</label>
+        <input type="text" id="hDescription" placeholder="Octopus circle hook, treble hook…" />
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Brand</label>
+          <input type="text" id="hBrand" placeholder="Gamakatsu, Owner…" />
+        </div>
+        <div class="form-group">
+          <label>Size</label>
+          <input type="text" id="hSize" placeholder="1/0, #4, 2X strong…" />
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Used For</label>
+        <input type="text" id="hUsedFor" placeholder="Live bait fishing for catfish, Texas-rigging soft plastics…" />
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-outline" onclick="navBack()">Cancel</button>
+        <button class="btn btn-primary" onclick="addHook()">🪝 Save Hook</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════ HOOK DETAIL PAGE ════════════════════ -->
+  <div class="page" id="page-hook-detail">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="navBack()">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+        Hooks
+      </button>
+      <span class="nav-title">Hook Details</span>
+    </div>
+    <div class="page-content">
+      <div class="gear-detail-icon">🪝</div>
+      <div class="gear-detail-name" id="hookDetailName"></div>
+      <div class="gear-detail-grid" id="hookDetailGrid"></div>
+      <div class="gear-edit-form" id="hookEditForm">
+        <input type="text" id="heDescriptionInput" placeholder="Description *" />
+        <input type="text" id="heBrandInput"       placeholder="Brand" />
+        <input type="text" id="heSizeInput"        placeholder="Size" />
+        <input type="text" id="heUsedForInput"     placeholder="Used For" />
+      </div>
+      <div class="detail-actions" id="hookDetailActions" style="margin-top:16px"></div>
+    </div>
+  </div>
+
 
   <!-- ════════════════════ ROD RACK PAGE ════════════════════ -->
   <div class="page" id="page-rods">
