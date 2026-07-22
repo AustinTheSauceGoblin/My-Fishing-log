@@ -904,6 +904,7 @@ function handleLureChange() {
   if (!isHardPlastic) {
     group.style.display = 'none';
     sel.value = '';
+    document.getElementById('fTrailerCustom').value = '';
     return;
   }
   group.style.display = '';
@@ -1198,7 +1199,7 @@ async function submitCatch() {
     lon:           document.getElementById('fLon').value !== '' ? parseFloat(document.getElementById('fLon').value) : '',
     sunrise:       document.getElementById('fSunrise').value,
     sunset:        document.getElementById('fSunset').value,
-    trailer:       document.getElementById('fTrailer').value,
+    trailer:       document.getElementById('fTrailerCustom').value.trim() || document.getElementById('fTrailer').value,
   };
 
   try {
@@ -1954,7 +1955,10 @@ function openEditCatch(id) {
   document.getElementById('fLure').value = matchedLure ? tackleLabelFor(matchedLure) : '';
   if (!matchedLure) document.getElementById('fLureCustom').value = c.lure || '';
   handleLureChange();
-  document.getElementById('fTrailer').value = c.trailer || '';
+  const trailerVal = (c.trailer||'').trim();
+  const matchedTrailer = getTackle().find(t => t.plasticType === 'Soft Plastic' && tackleLabelFor(t) === trailerVal);
+  document.getElementById('fTrailer').value = matchedTrailer ? tackleLabelFor(matchedTrailer) : '';
+  document.getElementById('fTrailerCustom').value = (!matchedTrailer && trailerVal) ? trailerVal : '';
   refreshRodDropdown();
   document.getElementById('fRod').value = c.rod || '';
   const prev = document.getElementById('fPhotoPreview');
@@ -2078,7 +2082,7 @@ function copyShareUrl() {
    FORM HELPERS
 ═══════════════════════════════════════════════════════════ */
 function resetForm() {
-  ['fFish','fWeight','fLureCustom','fWith','fLocation','fCity','fTrip','fNotes'].forEach(id=>document.getElementById(id).value='');
+  ['fFish','fWeight','fLureCustom','fTrailerCustom','fWith','fLocation','fCity','fTrip','fNotes'].forEach(id=>document.getElementById(id).value='');
   ['fLat','fLon','fSunrise','fSunset'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('sunPreview').textContent = '';
   document.getElementById('fPhoto').value='';
