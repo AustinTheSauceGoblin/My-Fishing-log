@@ -757,7 +757,7 @@ function renderTackleList() {
   const tackle = getTackle().map((t,i)=>({t,i})).filter(({t}) => !tackleTypeFilter || t.plasticType === tackleTypeFilter);
   const el = document.getElementById('tackleList');
   if (!tackle.length) {
-    el.innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:.76rem;color:#bbb;text-align:center;padding:24px">${tackleTypeFilter ? 'No '+tackleTypeFilter.toLowerCase()+' lures yet.' : 'No lures yet. Add one below.'}</div>`;
+    el.innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:.76rem;color:#bbb;text-align:center;padding:24px">${tackleTypeFilter ? `No "${tackleTypeFilter}" lures yet.` : 'No lures yet. Add one below.'}</div>`;
     return;
   }
   el.innerHTML = tackle.map(({t,i}) => {
