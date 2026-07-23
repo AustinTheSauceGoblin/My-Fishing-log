@@ -149,6 +149,7 @@
     .catch-tags { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 4px; }
     .tag { font-family: 'DM Mono', monospace; font-size: .62rem; padding: 2px 7px; border-radius: 20px; background: var(--parchment); color: var(--water-dk); border: 1px solid rgba(44,110,138,.2); }
     .catch-tap-hint { font-family: 'DM Mono', monospace; font-size: .58rem; color: #ccc; margin-top: 7px; }
+    .catch-notes-preview { font-size: .78rem; color: #888; margin-top: 6px; line-height: 1.4; font-style: italic; }
     .fav-card { border-color: rgba(217,79,79,.25); }
     .fav-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg,var(--heart),#e87a7a); }
     .catch-log-footer { display: flex; justify-content: center; gap: 10px; margin: 16px 0 4px; flex-wrap: wrap; }
@@ -249,8 +250,9 @@
     .gear-detail-value { font-size: .88rem; font-weight: 500; }
     .gear-edit-form { display: none; flex-direction: column; gap: 10px; margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
     .gear-edit-form.show { display: flex; }
-    .gear-edit-form input { font-family: 'DM Sans', sans-serif; font-size: .9rem; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; color: var(--ink); outline: none; }
-    .gear-edit-form input:focus { border-color: var(--water); }
+    .gear-edit-form input, .gear-edit-form select, .gear-edit-form textarea { font-family: 'DM Sans', sans-serif; font-size: .9rem; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #ddd; background: #fff; color: var(--ink); outline: none; width: 100%; }
+    .gear-edit-form input:focus, .gear-edit-form select:focus, .gear-edit-form textarea:focus { border-color: var(--water); }
+    .gear-edit-form textarea { min-height: 64px; resize: vertical; }
 
     /* ── SHOP CARDS ── */
     .shop-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(260px,1fr)); gap: 16px; }
@@ -822,6 +824,10 @@
         <label>Used For</label>
         <input type="text" id="hUsedFor" placeholder="Live bait fishing for catfish, Texas-rigging soft plastics…" />
       </div>
+      <div class="form-group">
+        <label>Comments</label>
+        <textarea id="hComments" placeholder="Your personal experience with this hook — hookup ratio, does it hold bait well, would you buy again…"></textarea>
+      </div>
       <div class="form-actions">
         <button class="btn btn-outline" onclick="navBack()">Cancel</button>
         <button class="btn btn-primary" onclick="addHook()">🪝 Save Hook</button>
@@ -847,6 +853,7 @@
         <input type="text" id="heBrandInput"       placeholder="Brand" />
         <input type="text" id="heSizeInput"        placeholder="Size" />
         <input type="text" id="heUsedForInput"     placeholder="Used For" />
+        <textarea id="heCommentsInput" placeholder="Comments — your personal experience…"></textarea>
       </div>
       <div class="detail-actions" id="hookDetailActions" style="margin-top:16px"></div>
     </div>

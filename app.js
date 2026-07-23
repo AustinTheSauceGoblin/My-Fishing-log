@@ -937,6 +937,7 @@ function buildHookCard(h, i) {
       <div class="catch-fish-name">${esc(h.description||'Hook')}</div>
       ${meta.length ? `<div class="catch-meta">${meta.map(m=>`<span>${esc(m)}</span>`).join('')}</div>` : ''}
       ${h.usedFor ? `<div class="catch-tags"><span class="tag">${esc(h.usedFor)}</span></div>` : ''}
+      ${h.comments ? `<div class="catch-notes-preview">${esc(h.comments.length>90?h.comments.slice(0,90)+'…':h.comments)}</div>` : ''}
       <div class="catch-tap-hint">tap for details &amp; edit →</div>
     </div>
   </div>`;
@@ -965,6 +966,7 @@ function addHook() {
     brand:   document.getElementById('hBrand').value.trim(),
     size:    document.getElementById('hSize').value.trim(),
     usedFor: document.getElementById('hUsedFor').value.trim(),
+    comments: document.getElementById('hComments').value.trim(),
   });
   saveHooksLS(hooks);
   showToast('🪝 Hook added!','success');
@@ -973,7 +975,7 @@ function addHook() {
 }
 
 function resetHookForm() {
-  ['hDescription','hBrand','hSize','hUsedFor'].forEach(id => document.getElementById(id).value = '');
+  ['hDescription','hBrand','hSize','hUsedFor','hComments'].forEach(id => document.getElementById(id).value = '');
 }
 
 function openHookDetail(id) {
@@ -985,11 +987,13 @@ function openHookDetail(id) {
     {label:'Brand',        value: h.brand       || '—'},
     {label:'Size',         value: h.size        || '—'},
     {label:'Used For',     value: h.usedFor     || '—'},
+    {label:'Comments',     value: h.comments    || '—'},
   ].map(f => `<div class="gear-detail-item"><div class="gear-detail-label">${f.label}</div><div class="gear-detail-value">${esc(f.value)}</div></div>`).join('');
   document.getElementById('heDescriptionInput').value = h.description || '';
   document.getElementById('heBrandInput').value       = h.brand       || '';
   document.getElementById('heSizeInput').value        = h.size        || '';
   document.getElementById('heUsedForInput').value      = h.usedFor     || '';
+  document.getElementById('heCommentsInput').value     = h.comments    || '';
   document.getElementById('hookEditForm').classList.remove('show');
   document.getElementById('hookDetailActions').innerHTML = `
     <button class="btn btn-outline" onclick="toggleHookEditForm()">✏️ Edit</button>
@@ -1020,6 +1024,7 @@ function saveHookEdit(id) {
     brand:   document.getElementById('heBrandInput').value.trim(),
     size:    document.getElementById('heSizeInput').value.trim(),
     usedFor: document.getElementById('heUsedForInput').value.trim(),
+    comments: document.getElementById('heCommentsInput').value.trim(),
   };
   saveHooksLS(hooks);
   showToast('Hook updated!','success');
